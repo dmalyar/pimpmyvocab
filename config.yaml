@@ -1,0 +1,9 @@
+log:
+  level:              # optional (default: debug)
+  file:               # optional (example: /home/sweet/.pimpmyvocab/pmv.log
+db:
+  url:                # required (example: postgresql://user:pass@localhost:5432/postgres?search_path=pimpmyvocab)
+bot:
+  use-proxy:          # true/false (default: false)
+  proxy-url:          # required if use-proxy == true
+  token:              # required
