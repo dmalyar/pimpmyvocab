@@ -68,7 +68,7 @@ func initLogger() *log.LoggerLogrus {
 		if err == nil {
 			logger.SetOutput(file)
 		} else {
-			logger.Errorf("Failed to log to file, using default stderr: %s\n", err)
+			logger.Errorf("Failed to log to file, using default stderr: %s", err)
 		}
 	}
 	logger.Info("Logger initialized")
@@ -97,7 +97,7 @@ func initBotAPI(logger log.Logger) *tgbotapi.BotAPI {
 
 	err := tgbotapi.SetLogger(logger)
 	if err != nil {
-		logger.Errorf("Error setting logger for bot: %s\n", err)
+		logger.Errorf("Error setting logger for bot: %s", err)
 	}
 
 	botAPI, err := tgbotapi.NewBotAPIWithClient(token, client)
@@ -116,12 +116,12 @@ func initVocabRepo(logger log.Logger) *repo.Postgres {
 	}
 	connConfig, err := pgxpool.ParseConfig(dbUrl)
 	if err != nil {
-		logger.Panicf("Error parsing DB URL: %s\n", err)
+		logger.Panicf("Error parsing DB URL: %s", err)
 	}
 	connConfig.ConnConfig.Logger = log.NewPgxAdapter(logger)
 	dbPool, err := pgxpool.ConnectConfig(context.Background(), connConfig)
 	if err != nil {
-		logger.Panicf("Error connecting to DB: %s\n", err)
+		logger.Panicf("Error connecting to DB: %s", err)
 	}
 	logger.Info("Repository initialized")
 	return repo.NewPostgresRepo(dbPool)

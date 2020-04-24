@@ -48,6 +48,6 @@ func (l *LoggerLogrus) Close() {
 	}
 	err := l.file.Close()
 	if err != nil {
-		l.Errorf("Error closing log file: %s\n", err)
+		l.Errorf("Error closing log file: %s", err)
 	}
 }

@@ -69,7 +69,7 @@ func (b *Bot) processStartCommand(contextLog log.Logger, chatID int64, userID in
 	replyText := startReplySucc
 	_, err := b.vocabService.CreateVocab(userID)
 	if err != nil {
-		contextLog.Errorf("Error processing start command: %s\n", err)
+		contextLog.Errorf("Error processing start command: %s", err)
 		replyText = startReplyErr
 	}
 	b.reply(contextLog, chatID, replyText, err)
@@ -80,6 +80,6 @@ func (b *Bot) reply(contextLog log.Logger, chatID int64, replyMsg string, err er
 	reply := tgbotapi.NewMessage(chatID, replyMsg)
 	_, err = b.api.Send(reply)
 	if err != nil {
-		contextLog.Errorf("Error sending reply: %s\n", err)
+		contextLog.Errorf("Error sending reply: %s", err)
 	}
 }

@@ -73,25 +73,25 @@ func TestVocabDB_CreateVocab(t *testing.T) {
 	for _, c := range cases {
 		vocab, err := vocabService.CreateVocab(c.userID)
 		if c.expectErr == false && err != nil {
-			t.Errorf("Expected no error, but got %s\n", err)
+			t.Errorf("Expected no error, but got %s", err)
 		}
 		if c.expectErr && err == nil {
-			t.Errorf("Expected error, but got nothing\n")
+			t.Errorf("Expected error, but got nothing")
 		}
 		if c.expectAddVocabInv != mockedRepo.AddVocabInvoked {
-			t.Errorf("Actual invocation of AddVocab(%v) doesn't match expectations\n", mockedRepo.AddVocabInvoked)
+			t.Errorf("Actual invocation of AddVocab(%v) doesn't match expectations", mockedRepo.AddVocabInvoked)
 		}
 		if c.expectGetVocabByUserIDInv != mockedRepo.GetVocabByUserIDInvoked {
-			t.Errorf("Actual invocation of GetVocabByUserID(%v) doesn't match expectations\n", mockedRepo.GetVocabByUserIDInvoked)
+			t.Errorf("Actual invocation of GetVocabByUserID(%v) doesn't match expectations", mockedRepo.GetVocabByUserIDInvoked)
 		}
 		if c.expectedVocab == nil && vocab != nil {
-			t.Errorf("Nil vocab expected\n")
+			t.Errorf("Nil vocab expected")
 		}
 		if c.expectedVocab != nil && vocab == nil {
-			t.Errorf("Not nil vocab expected\n")
+			t.Errorf("Not nil vocab expected")
 		}
 		if c.expectedVocab != nil && vocab != nil && *c.expectedVocab != *vocab {
-			t.Errorf("Expected vocab:%+v\nActual:%+v", c.expectedVocab, vocab)
+			t.Errorf("Expected vocab:%+v;Actual:%+v", c.expectedVocab, vocab)
 		}
 		mockedRepo.Reset()
 	}
