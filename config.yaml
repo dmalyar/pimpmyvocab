@@ -7,3 +7,5 @@ bot:
   use-proxy:          # true/false (default: false)
   proxy-url:          # required if use-proxy == true
   token:              # required
+dictionary:
+  token:              # required

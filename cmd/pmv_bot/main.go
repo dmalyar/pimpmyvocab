@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/dmalyar/pimpmyvocab/bot"
+	"github.com/dmalyar/pimpmyvocab/dictionary"
 	"github.com/dmalyar/pimpmyvocab/log"
 	"github.com/dmalyar/pimpmyvocab/repo"
 	"github.com/dmalyar/pimpmyvocab/service"
@@ -14,15 +15,17 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
 
 const (
-	logLevelKey = "log.level"
-	logFileKey  = "log.file"
-	tokenKey    = "bot.token"
-	useProxyKey = "bot.use-proxy"
-	proxyURLKey = "bot.proxy-url"
-	dbUrlKey    = "db.url"
+	logLevelKey        = "log.level"
+	logFileKey         = "log.file"
+	tokenKey           = "bot.token"
+	useProxyKey        = "bot.use-proxy"
+	proxyURLKey        = "bot.proxy-url"
+	dbUrlKey           = "db.url"
+	dictionaryTokenKey = "dictionary.token"
 )
 
 func main() {
@@ -35,7 +38,8 @@ func main() {
 
 	vocabRepo := initVocabRepo(logger)
 	defer vocabRepo.ClosePool()
-	vocabService := initVocabService(logger, vocabRepo)
+	vocabEntryService := initVocabEntryService(logger)
+	vocabService := initVocabService(logger, vocabRepo, vocabEntryService)
 
 	b := bot.New(logger, botAPI, vocabService)
 	b.Run()
@@ -48,18 +52,12 @@ func initViper() {
 	viper.AddConfigPath("$HOME/.pimpmyvocab")
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Sprintf("Error reading config file: %s", err))
+		panic(fmt.Sprintf("Error reading the config file: %s", err))
 	}
 }
 
 func initLogger() *log.LoggerLogrus {
 	logger := logrus.StandardLogger()
-
-	level, err := logrus.ParseLevel(viper.GetString(logLevelKey))
-	if err != nil {
-		logger.Panicf("Error parsing log level: %s", err)
-	}
-	logger.SetLevel(level)
 
 	logFilePath := viper.GetString(logFileKey)
 	var file *os.File
@@ -68,9 +66,17 @@ func initLogger() *log.LoggerLogrus {
 		if err == nil {
 			logger.SetOutput(file)
 		} else {
-			logger.Errorf("Failed to log to file, using default stderr: %s", err)
+			logger.Errorf("Error setting logger to write to file: %s", err)
 		}
 	}
+
+	level, err := logrus.ParseLevel(viper.GetString(logLevelKey))
+	if err != nil {
+		logger.Errorf("Error parsing log level: %s", err)
+		level = logrus.DebugLevel
+	}
+	logger.SetLevel(level)
+
 	logger.Info("Logger initialized")
 	return log.New(logger, file)
 }
@@ -79,14 +85,15 @@ func initBotAPI(logger log.Logger) *tgbotapi.BotAPI {
 	logger.Info("Initializing bot")
 	token := viper.GetString(tokenKey)
 	if token == "" {
-		logger.Panic("Token is not found in config file")
+		logger.Panic("Token not found in the config file")
 	}
 
 	client := new(http.Client)
 	if viper.GetBool(useProxyKey) {
+		logger.Info("Using proxy for connecting to bot API")
 		proxyRawURL := viper.GetString(proxyURLKey)
 		if proxyRawURL == "" {
-			logger.Panic("Proxy URL is not found in config file")
+			logger.Panic("Proxy URL not found in the config file")
 		}
 		proxyURL, err := url.Parse(proxyRawURL)
 		if err != nil {
@@ -102,7 +109,7 @@ func initBotAPI(logger log.Logger) *tgbotapi.BotAPI {
 
 	botAPI, err := tgbotapi.NewBotAPIWithClient(token, client)
 	if err != nil {
-		logger.Panic(err)
+		logger.Panicf("Error getting bot API: %s", err)
 	}
 	logger.Info("Bot initialized")
 	return botAPI
@@ -112,7 +119,7 @@ func initVocabRepo(logger log.Logger) *repo.Postgres {
 	logger.Info("Initializing repo")
 	dbUrl := viper.GetString(dbUrlKey)
 	if dbUrl == "" {
-		logger.Panic("DB URL is not found in config file")
+		logger.Panic("DB URL not found in the config file")
 	}
 	connConfig, err := pgxpool.ParseConfig(dbUrl)
 	if err != nil {
@@ -124,10 +131,24 @@ func initVocabRepo(logger log.Logger) *repo.Postgres {
 		logger.Panicf("Error connecting to DB: %s", err)
 	}
 	logger.Info("Repository initialized")
-	return repo.NewPostgresRepo(dbPool)
+	return repo.NewPostgresRepo(logger, dbPool)
 }
 
-func initVocabService(logger log.Logger, vocabRepo repo.Vocab) service.Vocab {
-	localRepoService := service.NewVocabWithLocalRepo(logger, vocabRepo)
+func initVocabEntryService(logger log.Logger) service.VocabEntry {
+	logger.Info("Initializing vocab entry service")
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	dictionaryToken := viper.GetString(dictionaryTokenKey)
+	if dictionaryToken == "" {
+		logger.Panic("Dictionary token not found in the config file")
+	}
+	dictionaryURL := fmt.Sprintf(dictionary.URL, dictionaryToken)
+	logger.Info("Vocab entry service initialized")
+	return dictionary.NewYandexDict(logger, client, dictionaryURL)
+}
+
+func initVocabService(logger log.Logger, vocabRepo repo.Vocab, vocabEntryService service.VocabEntry) service.Vocab {
+	localRepoService := service.NewVocabWithLocalRepo(logger, vocabRepo, vocabEntryService)
 	return service.NewConcurrentVocab(localRepoService)
 }

@@ -23,7 +23,7 @@ func (l *PgxAdapter) Log(_ context.Context, level pgx.LogLevel, msg string, data
 
 	switch level {
 	case pgx.LogLevelTrace:
-		logger.WithFields(map[string]interface{}{"PGX_LOG_LEVEL": level}).Debug(msg)
+		logger.WithField("PGX_LOG_LEVEL", level).Debug(msg)
 	case pgx.LogLevelDebug:
 		logger.Debug(msg)
 	case pgx.LogLevelInfo:
@@ -33,6 +33,6 @@ func (l *PgxAdapter) Log(_ context.Context, level pgx.LogLevel, msg string, data
 	case pgx.LogLevelError:
 		logger.Error(msg)
 	default:
-		logger.WithFields(map[string]interface{}{"PGX_LOG_LEVEL": level}).Error(msg)
+		logger.WithField("PGX_LOG_LEVEL", level).Error(msg)
 	}
 }

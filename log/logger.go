@@ -21,6 +21,7 @@ type Logger interface {
 	Println(v ...interface{})
 	Printf(format string, v ...interface{})
 
+	WithField(key string, value interface{}) Logger
 	WithFields(fields map[string]interface{}) Logger
 }
 
@@ -34,6 +35,10 @@ func New(logger *logrus.Logger, file *os.File) *LoggerLogrus {
 		FieldLogger: logger,
 		file:        file,
 	}
+}
+
+func (l *LoggerLogrus) WithField(key string, value interface{}) Logger {
+	return l.WithFields(map[string]interface{}{key: value})
 }
 
 func (l *LoggerLogrus) WithFields(fields map[string]interface{}) Logger {
