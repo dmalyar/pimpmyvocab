@@ -25,7 +25,6 @@ func NewVocabWithLocalRepo(logger log.Logger, localRepo repo.Vocab, entryService
 // CreateVocab creates a vocab in local localRepo for user.
 // Returns the created vocab entity.
 // Returns nil and skips vocab creation if user already has a vocab.
-// Return error if it occurs.
 func (v *VocabWithLocalRepo) CreateVocab(userID int) (*domain.Vocab, error) {
 	contextLog := v.logger.WithField("userID", userID)
 	contextLog.Debug("Checking if user already has a vocab")
@@ -46,11 +45,75 @@ func (v *VocabWithLocalRepo) CreateVocab(userID int) (*domain.Vocab, error) {
 	return vocab, nil
 }
 
+// CheckEntryInUserVocab checks if user already has the entry added to the vocab.
+func (v *VocabWithLocalRepo) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
+	contextLog := v.logger.WithFields(map[string]interface{}{
+		"entryID": entryID,
+		"userID":  userID,
+	})
+	contextLog.Debug("Checking if the entry is added to the user's vocab")
+	inVocab, err := v.localRepo.CheckEntryInUserVocab(entryID, userID)
+	if err != nil {
+		return false, fmt.Errorf("checking if entry is added to vocab: %s", err)
+	}
+	if inVocab {
+		contextLog.Info("Vocab entry is in the user's vocab")
+	} else {
+		contextLog.Info("Vocab entry is not in the user's vocab")
+	}
+	return inVocab, nil
+}
+
+// AddEntryToUserVocab adds the vocab entry to the user's vocab.
+// If user already has this entry added to the vocab then do nothing.
+func (v *VocabWithLocalRepo) AddEntryToUserVocab(entryID, userID int) error {
+	contextLog := v.logger.WithFields(map[string]interface{}{
+		"entryID": entryID,
+		"userID":  userID,
+	})
+	inVocab, err := v.CheckEntryInUserVocab(entryID, userID)
+	if err != nil {
+		return err
+	}
+	if inVocab {
+		return nil
+	}
+	contextLog.Debug("Adding the entry to the user's vocab")
+	err = v.localRepo.AddEntryToUserVocab(entryID, userID)
+	if err != nil {
+		return fmt.Errorf("adding entry to user's vocab: %s", err)
+	}
+	contextLog.Info("Vocab entry added to the user's vocab")
+	return nil
+}
+
+// RemoveEntryFromUserVocab removes the vocab entry from the user's vocab.
+// If the entry is not in the user's vocab then do nothing.
+func (v *VocabWithLocalRepo) RemoveEntryFromUserVocab(entryID, userID int) error {
+	contextLog := v.logger.WithFields(map[string]interface{}{
+		"entryID": entryID,
+		"userID":  userID,
+	})
+	inVocab, err := v.CheckEntryInUserVocab(entryID, userID)
+	if err != nil {
+		return err
+	}
+	if !inVocab {
+		return nil
+	}
+	contextLog.Debug("Removing the entry from the user's vocab")
+	err = v.localRepo.RemoveEntryFromUserVocab(entryID, userID)
+	if err != nil {
+		return fmt.Errorf("removing entry from user's vocab: %s", err)
+	}
+	contextLog.Info("Vocab entry removed from the user's vocab")
+	return nil
+}
+
 // GetVocabEntryByText looks for vocab entry in the local repo by the given text.
 // If it's found then returns it. If not then calls entry service method. If entry is found there then adds it
 // to the local repo.
 // If it's not found there then returns nil.
-// Returns error if it occurs.
 func (v *VocabWithLocalRepo) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {
 	contextLog := v.logger.WithField("text", text)
 	contextLog.Info("Getting vocab entry")
@@ -82,7 +145,6 @@ func (v *VocabWithLocalRepo) GetVocabEntryByText(text string) (*domain.VocabEntr
 
 // GetVocabEntryByID returns vocab entry found in the local repo by ID.
 // Returns nil if entry is not found.
-// Returns error if it occurs.
 func (v *VocabWithLocalRepo) GetVocabEntryByID(id int) (*domain.VocabEntry, error) {
 	contextLog := v.logger.WithField("ID", id)
 	contextLog.Info("Getting vocab entry")

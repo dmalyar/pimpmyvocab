@@ -70,9 +70,10 @@ func TestYandex_GetVocabEntryByText(t *testing.T) {
 		{
 			text: "Positive",
 			expectedEntry: &domain.VocabEntry{
-				ID:            0,
-				Text:          "Positive",
-				Transcription: "ˈpɒzɪtɪv",
+				ID:              0,
+				Text:            "Positive",
+				Transcription:   "ˈpɒzɪtɪv",
+				MainTranslation: "положительный",
 				Translations: []*domain.Translation{
 					{
 						ID:       0,

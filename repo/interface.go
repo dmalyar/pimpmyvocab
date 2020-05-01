@@ -10,4 +10,7 @@ type Vocab interface {
 	AddVocabEntry(entry *domain.VocabEntry) (*domain.VocabEntry, error)
 	GetVocabEntryByText(text string) (*domain.VocabEntry, error)
 	GetVocabEntryByID(id int) (*domain.VocabEntry, error)
+	CheckEntryInUserVocab(entryID, userID int) (bool, error)
+	AddEntryToUserVocab(entryID, userID int) error
+	RemoveEntryFromUserVocab(entryID, userID int) error
 }

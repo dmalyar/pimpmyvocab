@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const URL = "https://dictionary.yandex.net/api/v1/dicservice.json/lookup?key=%s&lang=en-ru&text="
@@ -78,7 +79,7 @@ func convertToVocabEntry(text string, res *Response) *domain.VocabEntry {
 	entry.Text = text
 	position := 0
 	for _, d := range res.Def {
-		if d.Text != text {
+		if strings.ToLower(d.Text) != strings.ToLower(text) {
 			continue
 		}
 		if entry.Transcription == "" {
@@ -100,6 +101,7 @@ func convertToVocabEntry(text string, res *Response) *domain.VocabEntry {
 	if len(entry.Translations) == 0 {
 		return nil
 	}
+	entry.MainTranslation = entry.Translations[0].Text
 	return entry
 }
 

@@ -4,8 +4,11 @@ import "github.com/dmalyar/pimpmyvocab/domain"
 
 // Vocab provides use cases for vocabs.
 type Vocab interface {
-	VocabEntry
 	CreateVocab(userID int) (*domain.Vocab, error)
+	CheckEntryInUserVocab(entryID, userID int) (bool, error)
+	AddEntryToUserVocab(entryID, userID int) error
+	RemoveEntryFromUserVocab(entryID, userID int) error
+	VocabEntry
 }
 
 type VocabEntry interface {

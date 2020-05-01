@@ -29,6 +29,15 @@ const (
 		"FROM vocab_entry WHERE text = $1"
 	getVocabEntryByID = "SELECT id, text, transcription " +
 		"FROM vocab_entry WHERE id = $1"
+	checkEntryInUserVocab = "SELECT l.entry_id " +
+		"FROM vocab v " +
+		"JOIN vocab_to_entry_link l on v.id = l.vocab_id " +
+		"WHERE l.entry_id = $1 and v.user_id = $2"
+	addEntryToUserVocab = "INSERT INTO vocab_to_entry_link(vocab_id, entry_id)" +
+		"SELECT id, $1 FROM vocab WHERE user_id = $2"
+	removeEntryFromUserVocab = "DELETE FROM vocab_to_entry_link " +
+		"WHERE entry_id = $1 " +
+		"AND vocab_id = (SELECT ID from vocab WHERE user_id = $2)"
 
 	addTranslation = "INSERT INTO translation(vocab_entry_id, text, class, position) " +
 		"VALUES ($1, $2, $3, $4) RETURNING id"
@@ -141,10 +150,57 @@ func (p *Postgres) getVocabEntry(contextLogger log.Logger, row pgx.Row) (*domain
 		if err != nil {
 			return nil, fmt.Errorf("scanning translation row: %s", err)
 		}
+		if t.Position == 0 {
+			entry.MainTranslation = t.Text
+		}
 	}
 	contextLogger = contextLogger.WithField("vocabEntry", entry)
 	contextLogger.Debug("Entry found in DB")
 	return entry, nil
+}
+
+func (p *Postgres) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
+	contextLogger := p.logger.WithFields(map[string]interface{}{
+		"entryID": entryID,
+		"userID":  userID,
+	})
+	contextLogger.Debug("Checking if the entry is added to the user's vocab in DB")
+	row := p.pool.QueryRow(context.Background(), checkEntryInUserVocab, entryID, userID)
+	id := new(int)
+	err := row.Scan(id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking if entry is added to vocab DB: %s", err)
+	}
+	return true, nil
+}
+
+func (p *Postgres) AddEntryToUserVocab(entryID, userID int) error {
+	contextLogger := p.logger.WithFields(map[string]interface{}{
+		"entryID": entryID,
+		"userID":  userID,
+	})
+	contextLogger.Debug("Adding the entry to the user's vocab in DB")
+	_, err := p.pool.Exec(context.Background(), addEntryToUserVocab, entryID, userID)
+	if err != nil {
+		return fmt.Errorf("adding entry to user's vocab in DB: %s", err)
+	}
+	return nil
+}
+
+func (p *Postgres) RemoveEntryFromUserVocab(entryID, userID int) error {
+	contextLogger := p.logger.WithFields(map[string]interface{}{
+		"entryID": entryID,
+		"userID":  userID,
+	})
+	contextLogger.Debug("Removing the entry from the user's vocab in DB")
+	_, err := p.pool.Exec(context.Background(), removeEntryFromUserVocab, entryID, userID)
+	if err != nil {
+		return fmt.Errorf("removing entry from user's vocab in DB: %s", err)
+	}
+	return nil
 }
 
 func (p *Postgres) ClosePool() {
