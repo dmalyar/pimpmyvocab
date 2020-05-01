@@ -38,6 +38,12 @@ const (
 	removeEntryFromUserVocab = "DELETE FROM vocab_to_entry_link " +
 		"WHERE entry_id = $1 " +
 		"AND vocab_id = (SELECT ID from vocab WHERE user_id = $2)"
+	getEntriesByUserID = "SELECT e.id, e.text, e.transcription, t.text " +
+		"FROM vocab v " +
+		"JOIN vocab_to_entry_link l on v.id = l.vocab_id " +
+		"JOIN vocab_entry e on l.entry_id = e.id " +
+		"JOIN translation t on e.id = t.vocab_entry_id " +
+		"WHERE v.user_id = $1 AND t.position = 0"
 
 	addTranslation = "INSERT INTO translation(vocab_entry_id, text, class, position) " +
 		"VALUES ($1, $2, $3, $4) RETURNING id"
@@ -201,6 +207,25 @@ func (p *Postgres) RemoveEntryFromUserVocab(entryID, userID int) error {
 		return fmt.Errorf("removing entry from user's vocab in DB: %s", err)
 	}
 	return nil
+}
+
+func (p *Postgres) GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
+	contextLog := p.logger.WithField("userID", userID)
+	contextLog.Debug("Getting entries from the user's vocab from DB")
+	rows, err := p.pool.Query(context.Background(), getEntriesByUserID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("getting entries from the user's vocab from DB: %s", err)
+	}
+	var entries []*domain.VocabEntry
+	for rows.Next() {
+		e := new(domain.VocabEntry)
+		entries = append(entries, e)
+		err := rows.Scan(&e.ID, &e.Text, &e.Transcription, &e.MainTranslation)
+		if err != nil {
+			return nil, fmt.Errorf("scanning entry row: %s", err)
+		}
+	}
+	return entries, nil
 }
 
 func (p *Postgres) ClosePool() {

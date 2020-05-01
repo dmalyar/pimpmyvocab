@@ -60,6 +60,14 @@ func (v *ConcurrentVocab) RemoveEntryFromUserVocab(entryID, userID int) error {
 	return v.wrappedService.RemoveEntryFromUserVocab(entryID, userID)
 }
 
+// GetVocabEntriesByUserID calls RemoveEntryFromUserVocab of wrapped vocabService with concurrent safe logic.
+// Makes one call of the wrapped method at a time per user.
+func (v *ConcurrentVocab) GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
+	v.vocabSync.startWork(userID)
+	defer v.vocabSync.endWork(userID)
+	return v.wrappedService.GetVocabEntriesByUserID(userID)
+}
+
 // GetVocabEntryByText calls GetVocabEntryByText of wrapped vocabService with concurrent safe logic.
 // Makes one call of the wrapped method at a time per text.
 func (v *ConcurrentVocab) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {

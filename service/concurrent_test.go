@@ -102,6 +102,25 @@ func TestConcurrentVocab_GetVocabEntryByText(t *testing.T) {
 	}
 }
 
+func TestConcurrentVocab_GetVocabEntriesByUserID(t *testing.T) {
+	mockedService := mockWrappedService()
+	testService := NewConcurrentVocab(mockedService)
+	var wg sync.WaitGroup
+	for i := 0; i < 300; i++ {
+		wg.Add(3)
+		go getVocabEntriesByUserID(&wg, testService, 1)
+		go getVocabEntriesByUserID(&wg, testService, 2)
+		go getVocabEntriesByUserID(&wg, testService, 3)
+	}
+	wg.Wait()
+	if !mockedService.GetVocabEntriesByUserIDInvoked {
+		t.Error("GetVocabEntriesByUserID wasn't invoked")
+	}
+	if mockedService.GetVocabEntriesByUserIDConcurrentlyInvoked {
+		t.Error("Underlying service was invoked concurrently for the same text")
+	}
+}
+
 func TestConcurrentVocab_GetVocabEntryByID(t *testing.T) {
 	mockedService := mockWrappedService()
 	testService := NewConcurrentVocab(mockedService)
@@ -134,6 +153,9 @@ func mockWrappedService() *mock.VocabServiceConcurrency {
 		func(entryID, userID int) error {
 			return nil
 		},
+		func(userID int) ([]*domain.VocabEntry, error) {
+			return nil, nil
+		},
 	)
 }
 
@@ -159,5 +181,10 @@ func removeEntryFromUserVocab(wg *sync.WaitGroup, s *ConcurrentVocab, entryID in
 
 func getVocabEntryByText(wg *sync.WaitGroup, s *ConcurrentVocab, word string) {
 	_, _ = s.GetVocabEntryByText(word)
+	wg.Done()
+}
+
+func getVocabEntriesByUserID(wg *sync.WaitGroup, s *ConcurrentVocab, userID int) {
+	_, _ = s.GetVocabEntriesByUserID(userID)
 	wg.Done()
 }

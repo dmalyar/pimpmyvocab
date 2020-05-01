@@ -110,6 +110,18 @@ func (v *VocabWithLocalRepo) RemoveEntryFromUserVocab(entryID, userID int) error
 	return nil
 }
 
+func (v *VocabWithLocalRepo) GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
+	contextLog := v.logger.WithField("userID", userID)
+	contextLog.Debugf("Getting vocab entries")
+	entries, err := v.localRepo.GetVocabEntriesByUserID(userID)
+	if err != nil {
+		contextLog.Errorf("getting vocab entries by user ID: %s", err)
+		return nil, err
+	}
+	contextLog.Infof("Found %v entry(-ies)", len(entries))
+	return entries, nil
+}
+
 // GetVocabEntryByText looks for vocab entry in the local repo by the given text.
 // If it's found then returns it. If not then calls entry service method. If entry is found there then adds it
 // to the local repo.

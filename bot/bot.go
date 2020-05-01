@@ -3,9 +3,11 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dmalyar/pimpmyvocab/domain"
 	"github.com/dmalyar/pimpmyvocab/log"
 	"github.com/dmalyar/pimpmyvocab/service"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"sort"
 	"strings"
 	"time"
 )
@@ -64,6 +66,8 @@ func (b *Bot) processMessage(msg *tgbotapi.Message) {
 	switch {
 	case text == startCommand:
 		b.processStartCommand(contextLog, chat.ID, user.ID)
+	case text == listCommand:
+		b.processListCommand(contextLog, chat.ID, user.ID)
 	case strings.HasPrefix(text, "/"):
 		contextLog.Info("Received unsupported command")
 	default:
@@ -118,6 +122,21 @@ func (b *Bot) processStartCommand(contextLog log.Logger, chatID int64, userID in
 	}
 	b.send(contextLog, newReply(chatID, replyText))
 	contextLog.Info("Processed /start command")
+}
+
+func (b *Bot) processListCommand(contextLog log.Logger, chatID int64, userID int) {
+	contextLog.Info("Received /list command")
+	entries, err := b.vocabService.GetVocabEntriesByUserID(userID)
+	if err != nil {
+		contextLog.Errorf("Error getting entries: %s", err)
+	}
+	if len(entries) == 0 {
+		contextLog.Info("Processed /list command (no entries)")
+		b.send(contextLog, newReply(chatID, emptyVocabReply))
+		return
+	}
+	b.send(contextLog, newReply(chatID, createListReply(entries)))
+	contextLog.Info("Processed /list command")
 }
 
 func (b *Bot) processText(contextLog log.Logger, chatID int64, msgID, userID int, text string) {
@@ -268,8 +287,16 @@ func (m *editTextMsg) WithFullDescKeyboard(contextLog log.Logger, entryID int, i
 	return m
 }
 
+func (m *editTextMsg) String() string {
+	return fmt.Sprintf("Edit message text (msgID = %v; with keyboard = %v): %s", m.MessageID, m.keyboardFlag, m.Text)
+}
+
 type editKeyboardMsg struct {
 	*tgbotapi.EditMessageReplyMarkupConfig
+}
+
+func (m *editKeyboardMsg) String() string {
+	return fmt.Sprintf("Edit keyboard message (msgID = %v)", m.MessageID)
 }
 
 func newEditKeyboardMsgShortDesc(contextLog log.Logger, chatID int64, msgID, entryID int, inVocab bool) *editKeyboardMsg {
@@ -375,8 +402,15 @@ type Callback struct {
 	Command CallbackCommand
 }
 
-func (m *editTextMsg) String() string {
-	return fmt.Sprintf("Edit message text (msgID = %v; with keyboard = %v): %s", m.MessageID, m.keyboardFlag, m.Text)
+func createListReply(entries []*domain.VocabEntry) string {
+	builder := new(strings.Builder)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Text < entries[j].Text
+	})
+	for _, entry := range entries {
+		builder.WriteString(fmt.Sprintf("%s – %s\n", entry.Text, entry.MainTranslation))
+	}
+	return builder.String()
 }
 
 func logProcessingTime(contextLog log.Logger, start time.Time) {

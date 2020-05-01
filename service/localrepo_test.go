@@ -153,7 +153,7 @@ func TestVocabWithLocalRepo_CheckEntryInUserVocab(t *testing.T) {
 			if c.expectedRes != res {
 				t.Errorf("Expected res:%+v;Actual:%+v", c.expectedRes, res)
 			}
-			if mockedRepo.CheckEntryInUserVocabInvoked == false {
+			if !mockedRepo.CheckEntryInUserVocabInvoked {
 				t.Errorf("CheckEntryInUserVocab was not invoked")
 			}
 			mockedRepo.Reset()
@@ -315,6 +315,66 @@ func TestVocabWithLocalRepo_RemoveEntryFromUserVocab(t *testing.T) {
 			}
 			if c.expectErr && err == nil {
 				t.Errorf("Expected error, but got nothing")
+			}
+			mockedRepo.Reset()
+		})
+	}
+}
+
+func TestVocabWithLocalRepo_GetVocabEntriesByUserID(t *testing.T) {
+	testCases := []struct {
+		name            string
+		userID          int
+		expectedEntries []*domain.VocabEntry
+		expectErr       bool
+	}{
+		{
+			name:   "Positive",
+			userID: 1,
+			expectedEntries: []*domain.VocabEntry{
+				{ID: 1, Text: "One"},
+				{ID: 2, Text: "Two"},
+			},
+		},
+		{
+			name:   "Positive no entries found",
+			userID: 2,
+		},
+		{
+			name:      "Get vocab entries returns err",
+			userID:    3,
+			expectErr: true,
+		},
+	}
+
+	mockedRepo := &mock.VocabRepo{
+		GetVocabEntriesByUserIDFn: func(userID int) ([]*domain.VocabEntry, error) {
+			switch userID {
+			case 1:
+				return []*domain.VocabEntry{
+					{ID: 1, Text: "One"},
+					{ID: 2, Text: "Two"},
+				}, nil
+			case 3:
+				return nil, fmt.Errorf("error")
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	vocabService := NewVocabWithLocalRepo(mock.Logger{}, mockedRepo, &mock.VocabEntryService{})
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			entries, err := vocabService.GetVocabEntriesByUserID(c.userID)
+			if c.expectErr && err == nil {
+				t.Errorf("Expected error, but got nothing")
+			}
+			if !reflect.DeepEqual(c.expectedEntries, entries) {
+				t.Errorf("Expected res:%+v;Actual:%+v", c.expectedEntries, entries)
+			}
+			if !mockedRepo.GetVocabEntriesByUserIDInvoked {
+				t.Errorf("GetVocabEntriesByUserIDInvoked was not invoked")
 			}
 			mockedRepo.Reset()
 		})
