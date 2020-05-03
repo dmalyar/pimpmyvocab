@@ -14,6 +14,9 @@ type VocabRepo struct {
 	GetVocabByUserIDFn      func(userID int) (*domain.Vocab, error)
 	GetVocabByUserIDInvoked bool
 
+	ClearVocabByUserIDFn      func(userID int) error
+	ClearVocabByUserIDInvoked bool
+
 	AddVocabEntryFn      func(vocab *domain.VocabEntry) (*domain.VocabEntry, error)
 	AddVocabEntryInvoked bool
 
@@ -23,17 +26,17 @@ type VocabRepo struct {
 	GetVocabEntryByIDFn      func(ID int) (*domain.VocabEntry, error)
 	GetVocabEntryByIDInvoked bool
 
-	CheckEntryInUserVocabFn      func(entryID, userID int) (bool, error)
-	CheckEntryInUserVocabInvoked bool
-
 	AddEntryToUserVocabFn      func(entryID, userID int) error
 	AddEntryToUserVocabInvoked bool
 
+	CheckEntryInUserVocabFn      func(entryID, userID int) (bool, error)
+	CheckEntryInUserVocabInvoked bool
+
+	GetEntriesByUserIDFn      func(userID int) ([]*domain.VocabEntry, error)
+	GetEntriesByUserIDInvoked bool
+
 	RemoveEntryFromUserVocabFn      func(entryID, userID int) error
 	RemoveEntryFromUserVocabInvoked bool
-
-	GetVocabEntriesByUserIDFn      func(userID int) ([]*domain.VocabEntry, error)
-	GetVocabEntriesByUserIDInvoked bool
 }
 
 // AddVocab registers invocation of AddVocab func and calls it.
@@ -46,6 +49,12 @@ func (r *VocabRepo) AddVocab(vocab *domain.Vocab) (*domain.Vocab, error) {
 func (r *VocabRepo) GetVocabByUserID(userID int) (*domain.Vocab, error) {
 	r.GetVocabByUserIDInvoked = true
 	return r.GetVocabByUserIDFn(userID)
+}
+
+// ClearVocabByUserID registers invocation of ClearVocabByUserID func and calls it.
+func (r *VocabRepo) ClearVocabByUserID(userID int) error {
+	r.ClearVocabByUserIDInvoked = true
+	return r.ClearVocabByUserIDFn(userID)
 }
 
 // AddVocabEntry registers invocation of AddVocabEntry func and calls it.
@@ -66,16 +75,22 @@ func (r *VocabRepo) GetVocabEntryByID(ID int) (*domain.VocabEntry, error) {
 	return r.GetVocabEntryByIDFn(ID)
 }
 
+// AddEntryToUserVocab registers invocation of AddEntryToUserVocab func and calls it.
+func (r *VocabRepo) AddEntryToUserVocab(entryID, userID int) error {
+	r.AddEntryToUserVocabInvoked = true
+	return r.AddEntryToUserVocabFn(entryID, userID)
+}
+
 // CheckEntryInUserVocab registers invocation of CheckEntryInUserVocab func and calls it.
 func (r *VocabRepo) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
 	r.CheckEntryInUserVocabInvoked = true
 	return r.CheckEntryInUserVocabFn(entryID, userID)
 }
 
-// AddEntryToUserVocab registers invocation of AddEntryToUserVocab func and calls it.
-func (r *VocabRepo) AddEntryToUserVocab(entryID, userID int) error {
-	r.AddEntryToUserVocabInvoked = true
-	return r.AddEntryToUserVocabFn(entryID, userID)
+// GetEntriesByUserID registers invocation of GetEntriesByUserID func and calls it.
+func (r *VocabRepo) GetEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
+	r.GetEntriesByUserIDInvoked = true
+	return r.GetEntriesByUserIDFn(userID)
 }
 
 // RemoveEntryFromUserVocab registers invocation of RemoveEntryFromUserVocab func and calls it.
@@ -84,23 +99,18 @@ func (r *VocabRepo) RemoveEntryFromUserVocab(entryID, userID int) error {
 	return r.RemoveEntryFromUserVocabFn(entryID, userID)
 }
 
-// GetVocabEntriesByUserID registers invocation of RemoveEntryFromUserVocab func and calls it.
-func (r *VocabRepo) GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
-	r.GetVocabEntriesByUserIDInvoked = true
-	return r.GetVocabEntriesByUserIDFn(userID)
-}
-
 // Reset resets functions invocation.
 func (r *VocabRepo) Reset() {
 	r.AddVocabInvoked = false
 	r.GetVocabByUserIDInvoked = false
+	r.ClearVocabByUserIDInvoked = false
 	r.AddVocabEntryInvoked = false
 	r.GetVocabEntryByTextInvoked = false
 	r.GetVocabEntryByIDInvoked = false
-	r.CheckEntryInUserVocabInvoked = false
 	r.AddEntryToUserVocabInvoked = false
+	r.CheckEntryInUserVocabInvoked = false
+	r.GetEntriesByUserIDInvoked = false
 	r.RemoveEntryFromUserVocabInvoked = false
-	r.GetVocabEntriesByUserIDInvoked = false
 }
 
 // VocabService is a mock struct implementing service.Vocab interface.
@@ -150,6 +160,7 @@ func (s *VocabService) Reset() {
 	s.CheckEntryInUserVocabInvoked = false
 	s.AddEntryToUserVocabInvoked = false
 	s.RemoveEntryFromUserVocabInvoked = false
+	s.VocabEntryService.Reset()
 }
 
 type VocabEntryService struct {
@@ -175,199 +186,146 @@ func (v *VocabEntryService) Reset() {
 	v.GetVocabEntryByIDInvoked = false
 }
 
-// VocabServiceConcurrency is a mock struct implementing service.Vocab interface.
+// VocabServiceConcurrencyCheck is a mock struct implementing service.Vocab interface.
 // You can test concurrent execution of methods with this struct.
-type VocabServiceConcurrency struct {
-	CreateVocabFn                  func(userID int) (*domain.Vocab, error)
-	createVocabMu                  sync.Mutex
-	CreateVocabInvoked             bool
-	CreateVocabConcurrentlyInvoked bool
-	createVocabConcurrencyCheck    map[int]struct{}
+type VocabServiceConcurrencyCheck struct {
+	CreateVocabFn      func(userID int) (*domain.Vocab, error)
+	CreateVocabInvoked bool
 
-	CheckEntryInUserVocabFn                  func(entryID, userID int) (bool, error)
-	checkEntryInUserVocabMu                  sync.Mutex
-	CheckEntryInUserVocabInvoked             bool
-	CheckEntryInUserVocabConcurrentlyInvoked bool
-	checkEntryInUserVocabConcurrencyCheck    map[int]struct{}
+	ClearUserVocabFn      func(userID int) error
+	ClearUserVocabInvoked bool
 
-	AddEntryToUserVocabFn                  func(entryID, userID int) error
-	addEntryToUserVocabMu                  sync.Mutex
-	AddEntryToUserVocabInvoked             bool
-	AddEntryToUserVocabConcurrentlyInvoked bool
-	addEntryToUserVocabConcurrencyCheck    map[int]struct{}
+	AddEntryToUserVocabFn      func(entryID, userID int) error
+	AddEntryToUserVocabInvoked bool
 
-	RemoveEntryFromUserVocabFn                  func(entryID, userID int) error
-	removeEntryFromUserVocabMu                  sync.Mutex
-	RemoveEntryFromUserVocabInvoked             bool
-	RemoveEntryFromUserVocabConcurrentlyInvoked bool
-	removeEntryFromUserVocabConcurrencyCheck    map[int]struct{}
+	CheckEntryInUserVocabFn      func(entryID, userID int) (bool, error)
+	CheckEntryInUserVocabInvoked bool
 
-	GetVocabEntriesByUserIDFn                  func(userID int) ([]*domain.VocabEntry, error)
-	getVocabEntriesByUserIDMu                  sync.Mutex
-	GetVocabEntriesByUserIDInvoked             bool
-	GetVocabEntriesByUserIDConcurrentlyInvoked bool
-	getVocabEntriesByUserIDConcurrencyCheck    map[int]struct{}
+	RemoveEntryFromUserVocabFn      func(entryID, userID int) error
+	RemoveEntryFromUserVocabInvoked bool
 
-	GetVocabEntryForWordFn                 func(word string) (*domain.VocabEntry, error)
-	getVocabEntryForWordMu                 sync.Mutex
-	GetVocabEntryByTextInvoked             bool
-	GetVocabEntryByTextConcurrentlyInvoked bool
-	getVocabEntryForWordConcurrencyCheck   map[string]struct{}
+	GetEntriesFromUserVocabFn      func(userID int) ([]*domain.VocabEntry, error)
+	GetEntriesFromUserVocabInvoked bool
+
+	GetVocabEntryByTextFn      func(text string) (*domain.VocabEntry, error)
+	GetVocabEntryByTextInvoked bool
 
 	GetVocabEntryByIDFn      func(ID int) (*domain.VocabEntry, error)
 	GetVocabEntryByIDInvoked bool
+
+	textConcurrencyCheckMu  sync.Mutex
+	textConcurrencyCheck    map[string]struct{}
+	TextConcurrentlyInvoked bool
+
+	userIDConcurrencyCheckMu  sync.Mutex
+	userIDConcurrencyCheck    map[int]struct{}
+	UserIDConcurrentlyInvoked bool
 }
 
-// NewVocabServiceConcurrency returns ready to use VocabServiceConcurrency.
-func NewVocabServiceConcurrency(createVocabFn func(userID int) (*domain.Vocab, error),
-	getVocabEntryForWordFn func(word string) (*domain.VocabEntry, error),
-	getVocabEntryByID func(ID int) (*domain.VocabEntry, error),
-	checkEntryInUserVocabFn func(entryID, userID int) (bool, error),
-	addEntryToUserVocab func(entryID, userID int) error,
-	removeEntryFromUserVocab func(entryID, userID int) error,
-	getVocabEntriesByUserID func(userID int) ([]*domain.VocabEntry, error),
-) *VocabServiceConcurrency {
-	return &VocabServiceConcurrency{
-		CreateVocabFn:                            createVocabFn,
-		createVocabConcurrencyCheck:              make(map[int]struct{}),
-		GetVocabEntryForWordFn:                   getVocabEntryForWordFn,
-		getVocabEntryForWordConcurrencyCheck:     make(map[string]struct{}),
-		AddEntryToUserVocabFn:                    addEntryToUserVocab,
-		addEntryToUserVocabConcurrencyCheck:      make(map[int]struct{}),
-		RemoveEntryFromUserVocabFn:               removeEntryFromUserVocab,
-		removeEntryFromUserVocabConcurrencyCheck: make(map[int]struct{}),
-		GetVocabEntriesByUserIDFn:                getVocabEntriesByUserID,
-		getVocabEntriesByUserIDConcurrencyCheck:  make(map[int]struct{}),
-		GetVocabEntryByIDFn:                      getVocabEntryByID,
-		CheckEntryInUserVocabFn:                  checkEntryInUserVocabFn,
-		checkEntryInUserVocabConcurrencyCheck:    make(map[int]struct{}),
+// NewVocabServiceConcurrencyCheck returns ready to use VocabServiceConcurrencyCheck.
+func NewVocabServiceConcurrencyCheck() *VocabServiceConcurrencyCheck {
+	return &VocabServiceConcurrencyCheck{
+		textConcurrencyCheck:   make(map[string]struct{}),
+		userIDConcurrencyCheck: make(map[int]struct{}),
 	}
 }
 
 // CreateVocab registers invocation of CreateVocab func and calls it.
 // Also registers if it was called concurrently by the same user.
-func (s *VocabServiceConcurrency) CreateVocab(userID int) (*domain.Vocab, error) {
-	s.createVocabMu.Lock()
-	s.CreateVocabInvoked = true
-	_, ok := s.createVocabConcurrencyCheck[userID]
-	if ok {
-		s.CreateVocabConcurrentlyInvoked = true
-	} else {
-		s.createVocabConcurrencyCheck[userID] = struct{}{}
-	}
-	s.createVocabMu.Unlock()
-	defer func() {
-		s.createVocabMu.Lock()
-		delete(s.createVocabConcurrencyCheck, userID)
-		s.createVocabMu.Unlock()
-	}()
+func (s *VocabServiceConcurrencyCheck) CreateVocab(userID int) (*domain.Vocab, error) {
+	s.startWorkSyncedByUserID(userID, &s.CreateVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
 	return s.CreateVocabFn(userID)
 }
 
-// CheckEntryInUserVocab registers invocation of CheckEntryInUserVocab func and calls it.
+// ClearUserVocab registers invocation of ClearUserVocab func and calls it.
 // Also registers if it was called concurrently by the same user.
-func (s *VocabServiceConcurrency) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
-	s.checkEntryInUserVocabMu.Lock()
-	s.CheckEntryInUserVocabInvoked = true
-	_, ok := s.checkEntryInUserVocabConcurrencyCheck[userID]
-	if ok {
-		s.CheckEntryInUserVocabConcurrentlyInvoked = true
-	} else {
-		s.checkEntryInUserVocabConcurrencyCheck[userID] = struct{}{}
-	}
-	s.checkEntryInUserVocabMu.Unlock()
-	defer func() {
-		s.checkEntryInUserVocabMu.Lock()
-		delete(s.checkEntryInUserVocabConcurrencyCheck, userID)
-		s.checkEntryInUserVocabMu.Unlock()
-	}()
-	return s.CheckEntryInUserVocabFn(entryID, userID)
+func (s *VocabServiceConcurrencyCheck) ClearUserVocab(userID int) error {
+	s.startWorkSyncedByUserID(userID, &s.ClearUserVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
+	return s.ClearUserVocabFn(userID)
 }
 
 // AddEntryToUserVocab registers invocation of AddEntryToUserVocab func and calls it.
 // Also registers if it was called concurrently by the same user.
-func (s *VocabServiceConcurrency) AddEntryToUserVocab(entryID, userID int) error {
-	s.addEntryToUserVocabMu.Lock()
-	s.AddEntryToUserVocabInvoked = true
-	_, ok := s.addEntryToUserVocabConcurrencyCheck[userID]
-	if ok {
-		s.AddEntryToUserVocabConcurrentlyInvoked = true
-	} else {
-		s.addEntryToUserVocabConcurrencyCheck[userID] = struct{}{}
-	}
-	s.addEntryToUserVocabMu.Unlock()
-	defer func() {
-		s.addEntryToUserVocabMu.Lock()
-		delete(s.addEntryToUserVocabConcurrencyCheck, userID)
-		s.addEntryToUserVocabMu.Unlock()
-	}()
+func (s *VocabServiceConcurrencyCheck) AddEntryToUserVocab(entryID, userID int) error {
+	s.startWorkSyncedByUserID(userID, &s.AddEntryToUserVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
 	return s.AddEntryToUserVocabFn(entryID, userID)
+}
+
+// CheckEntryInUserVocab registers invocation of CheckEntryInUserVocab func and calls it.
+// Also registers if it was called concurrently by the same user.
+func (s *VocabServiceConcurrencyCheck) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
+	s.startWorkSyncedByUserID(userID, &s.CheckEntryInUserVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
+	return s.CheckEntryInUserVocabFn(entryID, userID)
 }
 
 // RemoveEntryFromUserVocab registers invocation of RemoveEntryFromUserVocab func and calls it.
 // Also registers if it was called concurrently by the same user.
-func (s *VocabServiceConcurrency) RemoveEntryFromUserVocab(entryID, userID int) error {
-	s.removeEntryFromUserVocabMu.Lock()
-	s.RemoveEntryFromUserVocabInvoked = true
-	_, ok := s.removeEntryFromUserVocabConcurrencyCheck[userID]
-	if ok {
-		s.RemoveEntryFromUserVocabConcurrentlyInvoked = true
-	} else {
-		s.removeEntryFromUserVocabConcurrencyCheck[userID] = struct{}{}
-	}
-	s.removeEntryFromUserVocabMu.Unlock()
-	defer func() {
-		s.removeEntryFromUserVocabMu.Lock()
-		delete(s.removeEntryFromUserVocabConcurrencyCheck, userID)
-		s.removeEntryFromUserVocabMu.Unlock()
-	}()
+func (s *VocabServiceConcurrencyCheck) RemoveEntryFromUserVocab(entryID, userID int) error {
+	s.startWorkSyncedByUserID(userID, &s.RemoveEntryFromUserVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
 	return s.RemoveEntryFromUserVocabFn(entryID, userID)
 }
 
-// GetVocabEntriesByUserID registers invocation of GetVocabEntriesByUserID func and calls it.
+// GetEntriesByUserID registers invocation of GetEntriesByUserID func and calls it.
 // Also registers if it was called concurrently by the same user.
-func (s *VocabServiceConcurrency) GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
-	s.getVocabEntriesByUserIDMu.Lock()
-	s.GetVocabEntriesByUserIDInvoked = true
-	_, ok := s.getVocabEntriesByUserIDConcurrencyCheck[userID]
-	if ok {
-		s.GetVocabEntriesByUserIDConcurrentlyInvoked = true
-	} else {
-		s.getVocabEntriesByUserIDConcurrencyCheck[userID] = struct{}{}
-	}
-	s.getVocabEntriesByUserIDMu.Unlock()
-	defer func() {
-		s.getVocabEntriesByUserIDMu.Lock()
-		delete(s.getVocabEntriesByUserIDConcurrencyCheck, userID)
-		s.getVocabEntriesByUserIDMu.Unlock()
-	}()
-	return s.GetVocabEntriesByUserIDFn(userID)
+func (s *VocabServiceConcurrencyCheck) GetEntriesFromUserVocab(userID int) ([]*domain.VocabEntry, error) {
+	s.startWorkSyncedByUserID(userID, &s.GetEntriesFromUserVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
+	return s.GetEntriesFromUserVocabFn(userID)
 }
 
 // GetVocabEntryByText registers invocation of GetVocabEntryByText func and calls it.
-// Also registers if it was called concurrently for the same word.
-func (s *VocabServiceConcurrency) GetVocabEntryByText(word string) (*domain.VocabEntry, error) {
-	s.getVocabEntryForWordMu.Lock()
-	s.GetVocabEntryByTextInvoked = true
-	_, ok := s.getVocabEntryForWordConcurrencyCheck[word]
-	if ok {
-		s.GetVocabEntryByTextConcurrentlyInvoked = true
-	} else {
-		s.getVocabEntryForWordConcurrencyCheck[word] = struct{}{}
-	}
-	s.getVocabEntryForWordMu.Unlock()
-	defer func() {
-		s.getVocabEntryForWordMu.Lock()
-		delete(s.getVocabEntryForWordConcurrencyCheck, word)
-		s.getVocabEntryForWordMu.Unlock()
-	}()
-	return s.GetVocabEntryForWordFn(word)
+// Also registers if it was called concurrently for the same text.
+func (s *VocabServiceConcurrencyCheck) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {
+	s.startWorkSyncedByText(text, &s.GetVocabEntryByTextInvoked)
+	defer s.endWorkSyncedByText(text)
+	return s.GetVocabEntryByTextFn(text)
 }
 
 // GetVocabEntryByID registers invocation of GetVocabEntryByID func and calls it.
-func (s *VocabServiceConcurrency) GetVocabEntryByID(ID int) (*domain.VocabEntry, error) {
+func (s *VocabServiceConcurrencyCheck) GetVocabEntryByID(ID int) (*domain.VocabEntry, error) {
 	s.GetVocabEntryByIDInvoked = true
 	return s.GetVocabEntryByIDFn(ID)
+}
+
+func (s *VocabServiceConcurrencyCheck) startWorkSyncedByUserID(userID int, invocation *bool) {
+	s.userIDConcurrencyCheckMu.Lock()
+	*invocation = true
+	_, ok := s.userIDConcurrencyCheck[userID]
+	if ok {
+		s.UserIDConcurrentlyInvoked = true
+	} else {
+		s.userIDConcurrencyCheck[userID] = struct{}{}
+	}
+	s.userIDConcurrencyCheckMu.Unlock()
+}
+
+func (s *VocabServiceConcurrencyCheck) endWorkSyncedByUserID(userID int) {
+	s.userIDConcurrencyCheckMu.Lock()
+	delete(s.userIDConcurrencyCheck, userID)
+	s.userIDConcurrencyCheckMu.Unlock()
+}
+
+func (s *VocabServiceConcurrencyCheck) startWorkSyncedByText(text string, invocation *bool) {
+	s.textConcurrencyCheckMu.Lock()
+	*invocation = true
+	_, ok := s.textConcurrencyCheck[text]
+	if ok {
+		s.UserIDConcurrentlyInvoked = true
+	} else {
+		s.textConcurrencyCheck[text] = struct{}{}
+	}
+	s.textConcurrencyCheckMu.Unlock()
+}
+
+func (s *VocabServiceConcurrencyCheck) endWorkSyncedByText(text string) {
+	s.textConcurrencyCheckMu.Lock()
+	delete(s.textConcurrencyCheck, text)
+	s.textConcurrencyCheckMu.Unlock()
 }
 
 type Logger struct {

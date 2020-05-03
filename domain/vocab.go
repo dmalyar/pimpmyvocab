@@ -12,7 +12,7 @@ type Vocab struct {
 }
 
 func (v *Vocab) String() string {
-	return fmt.Sprintf("Vocab (ID: %v; UserID: %v)", v.ID, v.UserID)
+	return fmt.Sprintf("ID: %v; UserID: %v", v.ID, v.UserID)
 }
 
 type VocabEntry struct {
@@ -25,7 +25,7 @@ type VocabEntry struct {
 
 func (e *VocabEntry) String() string {
 	builder := new(strings.Builder)
-	builder.WriteString(fmt.Sprintf("VocabEntry (ID: %v; Text: %s; Transcription: %s; MainTranslation: %s; Translations: [",
+	builder.WriteString(fmt.Sprintf("ID: %v; Text: %s; Transcription: %s; MainTranslation: %s; Translations: [",
 		e.ID, e.Text, e.Transcription, e.MainTranslation))
 	for i, t := range e.Translations {
 		if i != 0 {
@@ -33,17 +33,23 @@ func (e *VocabEntry) String() string {
 		}
 		builder.WriteString(t.String())
 	}
-	builder.WriteString("])")
+	builder.WriteString("]")
 	return builder.String()
 }
 
 func (e *VocabEntry) ShortDesc() string {
-	return fmt.Sprintf("[%s]\n%s", e.Transcription, e.MainTranslation)
+	if e.Transcription != "" {
+		return fmt.Sprintf("[%s]\n%s", e.Transcription, e.MainTranslation)
+	} else {
+		return e.MainTranslation
+	}
 }
 
 func (e *VocabEntry) FullDesc() string {
 	builder := new(strings.Builder)
-	builder.WriteString(fmt.Sprintf("[%s]", e.Transcription))
+	if e.Transcription != "" {
+		builder.WriteString(fmt.Sprintf("[%s]", e.Transcription))
+	}
 	sort.Slice(e.Translations, func(i, j int) bool {
 		return e.Translations[i].Position < e.Translations[j].Position
 	})
@@ -67,5 +73,5 @@ type Translation struct {
 }
 
 func (t *Translation) String() string {
-	return fmt.Sprintf("Translation (ID: %v, Text: %s, Class: %s, Position: %v", t.ID, t.Text, t.Class, t.Position)
+	return fmt.Sprintf("ID: %v, Text: %s, Class: %s, Position: %v", t.ID, t.Text, t.Class, t.Position)
 }

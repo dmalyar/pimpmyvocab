@@ -42,12 +42,11 @@ func NewYandexDict(logger log.Logger, client *http.Client, url string) *Yandex {
 	}
 }
 
-// GetVocabEntryByText returns entry found in the Yandex.Dictionary service.
-// Returns nil if entry is not found.
-// Returns error if it occurs.
+// GetVocabEntryByText returns an entry found in the Yandex.Dictionary service.
+// Returns nil if entry was not found.
 func (y *Yandex) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {
-	contextLog := y.logger.WithField("text", text)
-	contextLog.Debug("Getting vocab entry from yandex dictionary")
+	logger := y.logger.WithField("text", text)
+	logger.Debug("Getting vocab entry from yandex dictionary")
 	req, err := http.NewRequest(http.MethodGet, y.url+url.PathEscape(text), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating http request: %s", err)
@@ -63,7 +62,7 @@ func (y *Yandex) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("yandex dictionary respond with code %v and body %s", res.StatusCode, string(body))
 	}
-	contextLog.Debugf("Yandex dictionary respond with body %v", string(body))
+	logger.Debugf("Yandex dictionary respond with body %v", string(body))
 	parsedRes, err := parseResponse(body)
 	if err != nil {
 		return nil, fmt.Errorf("parsing http response: %s", err)

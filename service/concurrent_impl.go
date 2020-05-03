@@ -36,12 +36,12 @@ func (v *ConcurrentVocab) CreateVocab(userID int) (*domain.Vocab, error) {
 	return v.wrappedService.CreateVocab(userID)
 }
 
-// CheckEntryInUserVocab calls CheckEntryInUserVocab of wrapped vocabService with concurrent safe logic.
+// ClearUserVocab calls ClearUserVocab of wrapped vocabService with concurrent safe logic.
 // Makes one call of the wrapped method at a time per user.
-func (v *ConcurrentVocab) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
+func (v *ConcurrentVocab) ClearUserVocab(userID int) error {
 	v.vocabSync.startWork(userID)
 	defer v.vocabSync.endWork(userID)
-	return v.wrappedService.CheckEntryInUserVocab(entryID, userID)
+	return v.wrappedService.ClearUserVocab(userID)
 }
 
 // AddEntryToUserVocab calls AddEntryToUserVocab of wrapped vocabService with concurrent safe logic.
@@ -52,6 +52,14 @@ func (v *ConcurrentVocab) AddEntryToUserVocab(entryID, userID int) error {
 	return v.wrappedService.AddEntryToUserVocab(entryID, userID)
 }
 
+// CheckEntryInUserVocab calls CheckEntryInUserVocab of wrapped vocabService with concurrent safe logic.
+// Makes one call of the wrapped method at a time per user.
+func (v *ConcurrentVocab) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
+	v.vocabSync.startWork(userID)
+	defer v.vocabSync.endWork(userID)
+	return v.wrappedService.CheckEntryInUserVocab(entryID, userID)
+}
+
 // RemoveEntryFromUserVocab calls RemoveEntryFromUserVocab of wrapped vocabService with concurrent safe logic.
 // Makes one call of the wrapped method at a time per user.
 func (v *ConcurrentVocab) RemoveEntryFromUserVocab(entryID, userID int) error {
@@ -60,12 +68,12 @@ func (v *ConcurrentVocab) RemoveEntryFromUserVocab(entryID, userID int) error {
 	return v.wrappedService.RemoveEntryFromUserVocab(entryID, userID)
 }
 
-// GetVocabEntriesByUserID calls RemoveEntryFromUserVocab of wrapped vocabService with concurrent safe logic.
+// GetEntriesByUserID calls RemoveEntryFromUserVocab of wrapped vocabService with concurrent safe logic.
 // Makes one call of the wrapped method at a time per user.
-func (v *ConcurrentVocab) GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
+func (v *ConcurrentVocab) GetEntriesFromUserVocab(userID int) ([]*domain.VocabEntry, error) {
 	v.vocabSync.startWork(userID)
 	defer v.vocabSync.endWork(userID)
-	return v.wrappedService.GetVocabEntriesByUserID(userID)
+	return v.wrappedService.GetEntriesFromUserVocab(userID)
 }
 
 // GetVocabEntryByText calls GetVocabEntryByText of wrapped vocabService with concurrent safe logic.

@@ -6,12 +6,14 @@ import "github.com/dmalyar/pimpmyvocab/domain"
 type Vocab interface {
 	AddVocab(vocab *domain.Vocab) (*domain.Vocab, error)
 	GetVocabByUserID(userID int) (*domain.Vocab, error)
+	ClearVocabByUserID(userID int) error
 
 	AddVocabEntry(entry *domain.VocabEntry) (*domain.VocabEntry, error)
 	GetVocabEntryByText(text string) (*domain.VocabEntry, error)
 	GetVocabEntryByID(id int) (*domain.VocabEntry, error)
-	CheckEntryInUserVocab(entryID, userID int) (bool, error)
+
 	AddEntryToUserVocab(entryID, userID int) error
+	CheckEntryInUserVocab(entryID, userID int) (bool, error)
+	GetEntriesByUserID(userID int) ([]*domain.VocabEntry, error)
 	RemoveEntryFromUserVocab(entryID, userID int) error
-	GetVocabEntriesByUserID(userID int) ([]*domain.VocabEntry, error)
 }
