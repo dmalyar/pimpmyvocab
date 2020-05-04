@@ -84,6 +84,8 @@ func (b *Bot) processMessage(in *tgbotapi.Message) {
 		b.processClearCommand(logger, msg)
 	case text == repeatCommand:
 		b.processRepeatCommand(logger, msg)
+	case text == quizCommand:
+		b.processQuizCommand(logger, msg)
 	case strings.HasPrefix(text, "/"):
 		logger.Info("Received unsupported command")
 	default:
@@ -149,6 +151,10 @@ func (b *Bot) processCallback(in *tgbotapi.CallbackQuery) {
 		b.processClearVocabAnswerCommand(logger, callbackMsg, false)
 	case repeatCallbackCmd:
 		b.processRepeatCallbackCommand(logger, callbackMsg)
+	case continueQuizCallbackCmd:
+		b.processContinueQuizCommand(logger, callbackMsg)
+	case showAnswerCallbackCmd:
+		b.processShowAnswerCommand(logger, callbackMsg)
 	default:
 		logger.Info("Received unsupported callback")
 	}
@@ -217,6 +223,23 @@ func (b *Bot) processRepeatCommand(logger log.Logger, msg *message) {
 	logger.Info("Processed /repeat command")
 }
 
+func (b *Bot) processQuizCommand(logger log.Logger, msg *message) {
+	logger.Info("Received /quiz command")
+	entry, err := b.vocabService.GetRandomEntryFromUserVocab(msg.userID, -1)
+	if err != nil {
+		logger.Errorf("Error getting random entry: %s", err)
+		b.send(logger, newReply(msg.chatID, techErrReply))
+		return
+	}
+	if entry == nil {
+		logger.Info("Processed /quiz command (no entries)")
+		b.send(logger, newReply(msg.chatID, emptyVocabReply))
+		return
+	}
+	b.send(logger, newReply(msg.chatID, entry.Text).withQuizKeyboard(logger, entry.ID))
+	logger.Info("Processed /quiz command")
+}
+
 func (b *Bot) processText(logger log.Logger, msg *message) {
 	logger.Info("Received text")
 	entry, err := b.vocabService.GetVocabEntryByText(strings.ToLower(msg.text))
@@ -264,7 +287,7 @@ func (b *Bot) processShowFullDescCommand(logger log.Logger, callbackMsg *callbac
 	}
 	b.send(
 		logger,
-		newEditText(callbackMsg.chatID, callbackMsg.msgID, entry.FullDesc(false)).WithFullDescKeyboard(logger, entry.ID, inVocab),
+		newEditText(callbackMsg.chatID, callbackMsg.msgID, entry.FullDesc(false)).withFullDescKeyboard(logger, entry.ID, inVocab),
 	)
 	logger.Info("Processed show full description callback command")
 }
@@ -349,6 +372,43 @@ func (b *Bot) processRepeatCallbackCommand(logger log.Logger, callbackMsg *callb
 	logger.Info("Processed repeat callback command")
 }
 
+func (b *Bot) processContinueQuizCommand(logger log.Logger, callbackMsg *callbackMessage) {
+	logger.Info("Received continue quiz callback command")
+	entry, err := b.vocabService.GetRandomEntryFromUserVocab(callbackMsg.userID, callbackMsg.data.EntryID)
+	if err != nil {
+		logger.Errorf("Error getting random entry: %s", err)
+		b.send(logger, newReply(callbackMsg.chatID, techErrReply))
+		return
+	}
+	if entry == nil {
+		logger.Info("Processed continue quiz callback command (no entries)")
+		b.send(logger, newReply(callbackMsg.chatID, emptyVocabReply))
+		return
+	}
+	b.send(logger, newReply(callbackMsg.chatID, entry.Text).withQuizKeyboard(logger, entry.ID))
+	logger.Info("Processed continue quiz callback command")
+}
+
+func (b *Bot) processShowAnswerCommand(logger log.Logger, callbackMsg *callbackMessage) {
+	logger.Info("Received show answer callback command")
+	entry, err := b.vocabService.GetVocabEntryByID(callbackMsg.data.EntryID)
+	if err != nil {
+		logger.Errorf("Error getting vocab entry: %s", err)
+		b.send(logger, newReply(callbackMsg.chatID, techErrReply))
+	}
+	if entry == nil {
+		logger.Errorf("Vocab entry not found")
+		b.send(logger, newReply(callbackMsg.chatID, techErrReply))
+		return
+	}
+	logger.WithField("vocabEntry", entry)
+	b.send(
+		logger,
+		newEditText(callbackMsg.chatID, callbackMsg.msgID, entry.FullDesc(true)).withQuizKeyboard(logger, entry.ID),
+	)
+	logger.Info("Processed show answer callback command")
+}
+
 func (b *Bot) send(logger log.Logger, msg tgbotapi.Chattable) {
 	logger = logger.WithField("msgToSend", msg)
 	_, err := b.api.Send(msg)
@@ -422,7 +482,7 @@ func (m *replyMsg) withClearConfirmationKeyboard(logger log.Logger) *replyMsg {
 	return m
 }
 
-func (m *replyMsg) withRepeatKeyboard(logger log.Logger, entryID int) tgbotapi.Chattable {
+func (m *replyMsg) withRepeatKeyboard(logger log.Logger, entryID int) *replyMsg {
 	callback, err := json.Marshal(CallbackData{
 		Command: repeatCallbackCmd,
 		EntryID: entryID,
@@ -434,6 +494,36 @@ func (m *replyMsg) withRepeatKeyboard(logger log.Logger, entryID int) tgbotapi.C
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(newWordButton, string(callback)),
+		),
+	)
+	m.ReplyMarkup = keyboard
+	m.keyboardFlag = true
+	return m
+}
+
+func (m *replyMsg) withQuizKeyboard(logger log.Logger, entryID int) *replyMsg {
+	continueCallback, err := json.Marshal(CallbackData{
+		Command: continueQuizCallbackCmd,
+		EntryID: entryID,
+	})
+	if err != nil {
+		logger.Errorf("Error generating quiz keyboard: %s", err)
+		return m
+	}
+	showAnswerCallback, err := json.Marshal(CallbackData{
+		Command: showAnswerCallbackCmd,
+		EntryID: entryID,
+	})
+	if err != nil {
+		logger.Errorf("Error generating quiz keyboard: %s", err)
+		return m
+	}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(showAnswerButton, string(showAnswerCallback)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(newWordButton, string(continueCallback)),
 		),
 	)
 	m.ReplyMarkup = keyboard
@@ -455,13 +545,32 @@ func newEditText(chatID int64, msgID int, text string) *editTextMsg {
 	return &editTextMsg{EditMessageTextConfig: &msg}
 }
 
-func (m *editTextMsg) WithFullDescKeyboard(logger log.Logger, entryID int, inVocab bool) *editTextMsg {
+func (m *editTextMsg) withFullDescKeyboard(logger log.Logger, entryID int, inVocab bool) *editTextMsg {
 	keyboard, err := fullDescKeyboard(entryID, inVocab)
 	if err != nil {
 		logger.Errorf("Error generating full desc keyboard: %s", err)
 		return m
 	}
 	m.ReplyMarkup = keyboard
+	m.keyboardFlag = true
+	return m
+}
+
+func (m *editTextMsg) withQuizKeyboard(logger log.Logger, entryID int) *editTextMsg {
+	callback, err := json.Marshal(CallbackData{
+		Command: continueQuizCallbackCmd,
+		EntryID: entryID,
+	})
+	if err != nil {
+		logger.Errorf("Error generating quiz keyboard: %s", err)
+		return m
+	}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(newWordButton, string(callback)),
+		),
+	)
+	m.ReplyMarkup = &keyboard
 	m.keyboardFlag = true
 	return m
 }
