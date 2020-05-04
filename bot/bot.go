@@ -82,6 +82,8 @@ func (b *Bot) processMessage(in *tgbotapi.Message) {
 		b.processListCommand(logger, msg)
 	case text == clearCommand:
 		b.processClearCommand(logger, msg)
+	case text == repeatCommand:
+		b.processRepeatCommand(logger, msg)
 	case strings.HasPrefix(text, "/"):
 		logger.Info("Received unsupported command")
 	default:
@@ -131,20 +133,22 @@ func (b *Bot) processCallback(in *tgbotapi.CallbackQuery) {
 		return
 	}
 	switch callbackMsg.data.Command {
-	case showFullDesc:
+	case showFullDescCallbackCmd:
 		b.processShowFullDescCommand(logger, callbackMsg)
-	case addToVocab:
+	case addToVocabCallbackCmd:
 		b.processAddToVocabCommand(logger, callbackMsg, false)
-	case addToVocabFullDesc:
+	case addToVocabFullDescCallbackCmd:
 		b.processAddToVocabCommand(logger, callbackMsg, true)
-	case removeFromVocab:
+	case rmFromVocabCallbackCmd:
 		b.processRemoveFromVocabCommand(logger, callbackMsg, false)
-	case removeFromVocabFullDesc:
+	case rmFromVocabFullDescCallbackCmd:
 		b.processRemoveFromVocabCommand(logger, callbackMsg, true)
-	case clearVocabAccept:
+	case clearVocabAcceptCallbackCmd:
 		b.processClearVocabAnswerCommand(logger, callbackMsg, true)
-	case clearVocabDecline:
+	case clearVocabDeclineCallbackCmd:
 		b.processClearVocabAnswerCommand(logger, callbackMsg, false)
+	case repeatCallbackCmd:
+		b.processRepeatCallbackCommand(logger, callbackMsg)
 	default:
 		logger.Info("Received unsupported callback")
 	}
@@ -152,13 +156,13 @@ func (b *Bot) processCallback(in *tgbotapi.CallbackQuery) {
 
 func (b *Bot) processStartCommand(logger log.Logger, msg *message) {
 	logger.Info("Received /start command")
-	replyText := startReply
 	_, err := b.vocabService.CreateVocab(msg.userID)
 	if err != nil {
 		logger.Errorf("Error creating vocab: %s", err)
-		replyText = techErrReply
+		b.send(logger, newReply(msg.chatID, techErrReply))
+		return
 	}
-	b.send(logger, newReply(msg.chatID, replyText))
+	b.send(logger, newReply(msg.chatID, startReply))
 	logger.Info("Processed /start command")
 }
 
@@ -167,6 +171,8 @@ func (b *Bot) processListCommand(logger log.Logger, msg *message) {
 	entries, err := b.vocabService.GetEntriesFromUserVocab(msg.userID)
 	if err != nil {
 		logger.Errorf("Error getting entries: %s", err)
+		b.send(logger, newReply(msg.chatID, techErrReply))
+		return
 	}
 	if len(entries) == 0 {
 		logger.Info("Processed /list command (no entries)")
@@ -192,6 +198,23 @@ func (b *Bot) processClearCommand(logger log.Logger, msg *message) {
 	logger.Info("Received /clear command")
 	b.send(logger, newReply(msg.chatID, clearVocabConfirmationReply).withClearConfirmationKeyboard(logger))
 	logger.Info("Processed /clear command")
+}
+
+func (b *Bot) processRepeatCommand(logger log.Logger, msg *message) {
+	logger.Info("Received /repeat command")
+	entry, err := b.vocabService.GetRandomEntryFromUserVocab(msg.userID, -1)
+	if err != nil {
+		logger.Errorf("Error getting random entry: %s", err)
+		b.send(logger, newReply(msg.chatID, techErrReply))
+		return
+	}
+	if entry == nil {
+		logger.Info("Processed /repeat command (no entries)")
+		b.send(logger, newReply(msg.chatID, emptyVocabReply))
+		return
+	}
+	b.send(logger, newReply(msg.chatID, entry.FullDesc(true)).withRepeatKeyboard(logger, entry.ID))
+	logger.Info("Processed /repeat command")
 }
 
 func (b *Bot) processText(logger log.Logger, msg *message) {
@@ -241,7 +264,7 @@ func (b *Bot) processShowFullDescCommand(logger log.Logger, callbackMsg *callbac
 	}
 	b.send(
 		logger,
-		newEditText(callbackMsg.chatID, callbackMsg.msgID, entry.FullDesc()).WithFullDescKeyboard(logger, entry.ID, inVocab),
+		newEditText(callbackMsg.chatID, callbackMsg.msgID, entry.FullDesc(false)).WithFullDescKeyboard(logger, entry.ID, inVocab),
 	)
 	logger.Info("Processed show full description callback command")
 }
@@ -309,6 +332,23 @@ func (b *Bot) processClearVocabAnswerCommand(logger log.Logger, callbackMsg *cal
 	logger.Info("Processed clear vocab answer callback command")
 }
 
+func (b *Bot) processRepeatCallbackCommand(logger log.Logger, callbackMsg *callbackMessage) {
+	logger.Info("Received repeat callback command")
+	entry, err := b.vocabService.GetRandomEntryFromUserVocab(callbackMsg.userID, callbackMsg.data.EntryID)
+	if err != nil {
+		logger.Errorf("Error getting random entry: %s", err)
+		b.send(logger, newReply(callbackMsg.chatID, techErrReply))
+		return
+	}
+	if entry == nil {
+		logger.Info("Processed repeat callback command (no entries)")
+		b.send(logger, newReply(callbackMsg.chatID, emptyVocabReply))
+		return
+	}
+	b.send(logger, newReply(callbackMsg.chatID, entry.FullDesc(true)).withRepeatKeyboard(logger, entry.ID))
+	logger.Info("Processed repeat callback command")
+}
+
 func (b *Bot) send(logger log.Logger, msg tgbotapi.Chattable) {
 	logger = logger.WithField("msgToSend", msg)
 	_, err := b.api.Send(msg)
@@ -359,12 +399,12 @@ func (m *replyMsg) withShortDescKeyboard(logger log.Logger, entryID int, inVocab
 }
 
 func (m *replyMsg) withClearConfirmationKeyboard(logger log.Logger) *replyMsg {
-	clearVocabAcceptCallback, err := json.Marshal(CallbackData{Command: clearVocabAccept})
+	clearVocabAcceptCallback, err := json.Marshal(CallbackData{Command: clearVocabAcceptCallbackCmd})
 	if err != nil {
 		logger.Errorf("Error generating clear confirmation keyboard: %s", err)
 		return m
 	}
-	clearVocabDeclineCallback, err := json.Marshal(CallbackData{Command: clearVocabDecline})
+	clearVocabDeclineCallback, err := json.Marshal(CallbackData{Command: clearVocabDeclineCallbackCmd})
 	if err != nil {
 		logger.Errorf("Error generating clear confirmation keyboard: %s", err)
 		return m
@@ -375,6 +415,25 @@ func (m *replyMsg) withClearConfirmationKeyboard(logger log.Logger) *replyMsg {
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(noButton, string(clearVocabDeclineCallback)),
+		),
+	)
+	m.ReplyMarkup = keyboard
+	m.keyboardFlag = true
+	return m
+}
+
+func (m *replyMsg) withRepeatKeyboard(logger log.Logger, entryID int) tgbotapi.Chattable {
+	callback, err := json.Marshal(CallbackData{
+		Command: repeatCallbackCmd,
+		EntryID: entryID,
+	})
+	if err != nil {
+		logger.Errorf("Error generating repeat keyboard: %s", err)
+		return m
+	}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(newWordButton, string(callback)),
 		),
 	)
 	m.ReplyMarkup = keyboard
@@ -445,13 +504,13 @@ func shortDescKeyboard(entryID int, inVocab bool) (*tgbotapi.InlineKeyboardMarku
 		vocabActionButton = removeFromVocabButton
 		vocabActionCallback, err = json.Marshal(CallbackData{
 			EntryID: entryID,
-			Command: removeFromVocab,
+			Command: rmFromVocabCallbackCmd,
 		})
 	} else {
 		vocabActionButton = addToVocabButton
 		vocabActionCallback, err = json.Marshal(CallbackData{
 			EntryID: entryID,
-			Command: addToVocab,
+			Command: addToVocabCallbackCmd,
 		})
 	}
 	if err != nil {
@@ -459,7 +518,7 @@ func shortDescKeyboard(entryID int, inVocab bool) (*tgbotapi.InlineKeyboardMarku
 	}
 	showFullDescCallback, err := json.Marshal(CallbackData{
 		EntryID: entryID,
-		Command: showFullDesc,
+		Command: showFullDescCallbackCmd,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling show full desc action callback json for short desc keyboard: %s", err)
@@ -483,13 +542,13 @@ func fullDescKeyboard(entryID int, inVocab bool) (*tgbotapi.InlineKeyboardMarkup
 		vocabActionButton = removeFromVocabButton
 		vocabActionCallback, err = json.Marshal(CallbackData{
 			EntryID: entryID,
-			Command: removeFromVocabFullDesc,
+			Command: rmFromVocabFullDescCallbackCmd,
 		})
 	} else {
 		vocabActionButton = addToVocabButton
 		vocabActionCallback, err = json.Marshal(CallbackData{
 			EntryID: entryID,
-			Command: addToVocabFullDesc,
+			Command: addToVocabFullDescCallbackCmd,
 		})
 	}
 	if err != nil {

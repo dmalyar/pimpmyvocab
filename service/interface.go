@@ -9,9 +9,9 @@ type Vocab interface {
 
 	AddEntryToUserVocab(entryID, userID int) error
 	CheckEntryInUserVocab(entryID, userID int) (bool, error)
-	RemoveEntryFromUserVocab(entryID, userID int) error
-
+	GetRandomEntryFromUserVocab(userID, previousEntryID int) (*domain.VocabEntry, error)
 	GetEntriesFromUserVocab(userID int) ([]*domain.VocabEntry, error)
+	RemoveEntryFromUserVocab(entryID, userID int) error
 
 	VocabEntry
 }

@@ -95,25 +95,25 @@ func TestConcurrentVocab_CheckEntryInUserVocab(t *testing.T) {
 	}
 }
 
-func TestConcurrentVocab_RemoveEntryFromUserVocab(t *testing.T) {
+func TestConcurrentVocab_GetRandomEntryFromUserVocab(t *testing.T) {
 	mockedService := mock.NewVocabServiceConcurrencyCheck()
-	mockedService.RemoveEntryFromUserVocabFn = func(entryID, userID int) error {
-		return nil
+	mockedService.GetRandomEntryFromUserVocabFn = func(userID, previousEntryID int) (*domain.VocabEntry, error) {
+		return &domain.VocabEntry{}, nil
 	}
 	testService := NewConcurrentVocab(mockedService)
 	var wg sync.WaitGroup
 	for i := 0; i < 300; i++ {
 		wg.Add(3)
-		go removeEntryFromUserVocab(&wg, testService, 1, 1)
-		go removeEntryFromUserVocab(&wg, testService, 2, 2)
-		go removeEntryFromUserVocab(&wg, testService, 3, 1)
+		go getRandomEntryFromUserVocab(&wg, testService, 1)
+		go getRandomEntryFromUserVocab(&wg, testService, 2)
+		go getRandomEntryFromUserVocab(&wg, testService, 3)
 	}
 	wg.Wait()
-	if !mockedService.RemoveEntryFromUserVocabInvoked {
-		t.Error("RemoveEntryFromUserVocab wasn't invoked")
+	if !mockedService.GetRandomEntryFromUserVocabInvoked {
+		t.Error("GetRandomEntryFromUserVocab wasn't invoked")
 	}
 	if mockedService.UserIDConcurrentlyInvoked {
-		t.Error("Underlying service was invoked concurrently by the same user")
+		t.Error("Underlying service was invoked concurrently for the same text")
 	}
 }
 
@@ -136,6 +136,28 @@ func TestConcurrentVocab_GetEntriesFromUserVocab(t *testing.T) {
 	}
 	if mockedService.UserIDConcurrentlyInvoked {
 		t.Error("Underlying service was invoked concurrently for the same text")
+	}
+}
+
+func TestConcurrentVocab_RemoveEntryFromUserVocab(t *testing.T) {
+	mockedService := mock.NewVocabServiceConcurrencyCheck()
+	mockedService.RemoveEntryFromUserVocabFn = func(entryID, userID int) error {
+		return nil
+	}
+	testService := NewConcurrentVocab(mockedService)
+	var wg sync.WaitGroup
+	for i := 0; i < 300; i++ {
+		wg.Add(3)
+		go removeEntryFromUserVocab(&wg, testService, 1, 1)
+		go removeEntryFromUserVocab(&wg, testService, 2, 2)
+		go removeEntryFromUserVocab(&wg, testService, 3, 1)
+	}
+	wg.Wait()
+	if !mockedService.RemoveEntryFromUserVocabInvoked {
+		t.Error("RemoveEntryFromUserVocab wasn't invoked")
+	}
+	if mockedService.UserIDConcurrentlyInvoked {
+		t.Error("Underlying service was invoked concurrently by the same user")
 	}
 }
 
@@ -190,22 +212,26 @@ func TestConcurrentVocab_SyncByUserIDTest(t *testing.T) {
 	mockedService.CheckEntryInUserVocabFn = func(entryID, userID int) (bool, error) {
 		return true, nil
 	}
-	mockedService.RemoveEntryFromUserVocabFn = func(entryID, userID int) error {
-		return nil
+	mockedService.GetRandomEntryFromUserVocabFn = func(userId, previousEntryID int) (*domain.VocabEntry, error) {
+		return &domain.VocabEntry{}, nil
 	}
 	mockedService.GetEntriesFromUserVocabFn = func(userID int) ([]*domain.VocabEntry, error) {
 		return []*domain.VocabEntry{}, nil
 	}
+	mockedService.RemoveEntryFromUserVocabFn = func(entryID, userID int) error {
+		return nil
+	}
 	testService := NewConcurrentVocab(mockedService)
 	var wg sync.WaitGroup
 	for i := 0; i < 300; i++ {
-		wg.Add(6)
+		wg.Add(7)
 		go createVocab(&wg, testService, 1)
 		go clearVocab(&wg, testService, 1)
 		go addEntryToUserVocab(&wg, testService, 1, 1)
 		go checkEntryInUserVocab(&wg, testService, 1, 1)
-		go removeEntryFromUserVocab(&wg, testService, 1, 1)
+		go getRandomEntryFromUserVocab(&wg, testService, 1)
 		go getEntriesFromUserVocab(&wg, testService, 1)
+		go removeEntryFromUserVocab(&wg, testService, 1, 1)
 	}
 	wg.Wait()
 	if mockedService.UserIDConcurrentlyInvoked {
@@ -230,6 +256,11 @@ func addEntryToUserVocab(wg *sync.WaitGroup, s *ConcurrentVocab, entryID int, us
 
 func checkEntryInUserVocab(wg *sync.WaitGroup, s *ConcurrentVocab, entryID int, userID int) {
 	_, _ = s.CheckEntryInUserVocab(entryID, userID)
+	wg.Done()
+}
+
+func getRandomEntryFromUserVocab(wg *sync.WaitGroup, s *ConcurrentVocab, userID int) {
+	_, _ = s.GetRandomEntryFromUserVocab(userID, 0)
 	wg.Done()
 }
 

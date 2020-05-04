@@ -23,7 +23,7 @@ type VocabRepo struct {
 	GetVocabEntryByTextFn      func(text string) (*domain.VocabEntry, error)
 	GetVocabEntryByTextInvoked bool
 
-	GetVocabEntryByIDFn      func(ID int) (*domain.VocabEntry, error)
+	GetVocabEntryByIDFn      func(id int) (*domain.VocabEntry, error)
 	GetVocabEntryByIDInvoked bool
 
 	AddEntryToUserVocabFn      func(entryID, userID int) error
@@ -31,6 +31,9 @@ type VocabRepo struct {
 
 	CheckEntryInUserVocabFn      func(entryID, userID int) (bool, error)
 	CheckEntryInUserVocabInvoked bool
+
+	GetEntryIDsByUserIDFn      func(userID int) ([]int, error)
+	GetEntryIDsByUserIDInvoked bool
 
 	GetEntriesByUserIDFn      func(userID int) ([]*domain.VocabEntry, error)
 	GetEntriesByUserIDInvoked bool
@@ -70,9 +73,9 @@ func (r *VocabRepo) GetVocabEntryByText(text string) (*domain.VocabEntry, error)
 }
 
 // GetVocabEntryByID registers invocation of GetVocabEntryByID func and calls it.
-func (r *VocabRepo) GetVocabEntryByID(ID int) (*domain.VocabEntry, error) {
+func (r *VocabRepo) GetVocabEntryByID(id int) (*domain.VocabEntry, error) {
 	r.GetVocabEntryByIDInvoked = true
-	return r.GetVocabEntryByIDFn(ID)
+	return r.GetVocabEntryByIDFn(id)
 }
 
 // AddEntryToUserVocab registers invocation of AddEntryToUserVocab func and calls it.
@@ -85,6 +88,12 @@ func (r *VocabRepo) AddEntryToUserVocab(entryID, userID int) error {
 func (r *VocabRepo) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
 	r.CheckEntryInUserVocabInvoked = true
 	return r.CheckEntryInUserVocabFn(entryID, userID)
+}
+
+// GetEntryIDsByUserID registers invocation of GetEntryIDsByUserID func and calls it.
+func (r *VocabRepo) GetEntryIDsByUserID(userID int) ([]int, error) {
+	r.GetEntryIDsByUserIDInvoked = true
+	return r.GetEntryIDsByUserIDFn(userID)
 }
 
 // GetEntriesByUserID registers invocation of GetEntriesByUserID func and calls it.
@@ -111,56 +120,6 @@ func (r *VocabRepo) Reset() {
 	r.CheckEntryInUserVocabInvoked = false
 	r.GetEntriesByUserIDInvoked = false
 	r.RemoveEntryFromUserVocabInvoked = false
-}
-
-// VocabService is a mock struct implementing service.Vocab interface.
-type VocabService struct {
-	CreateVocabFn      func(userID int) (*domain.Vocab, error)
-	CreateVocabInvoked bool
-
-	CheckEntryInUserVocabFn      func(entryID, userID int) (bool, error)
-	CheckEntryInUserVocabInvoked bool
-
-	AddEntryToUserVocabFn      func(entryID, userID int) error
-	AddEntryToUserVocabInvoked bool
-
-	RemoveEntryFromUserVocabFn      func(entryID, userID int) error
-	RemoveEntryFromUserVocabInvoked bool
-
-	VocabEntryService
-}
-
-// CreateVocab registers invocation of CreateVocab func and calls it.
-func (s *VocabService) CreateVocab(userID int) (*domain.Vocab, error) {
-	s.CreateVocabInvoked = true
-	return s.CreateVocabFn(userID)
-}
-
-// CheckEntryInUserVocab registers invocation of CheckEntryInUserVocab func and calls it.
-func (s *VocabService) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
-	s.CheckEntryInUserVocabInvoked = true
-	return s.CheckEntryInUserVocabFn(entryID, userID)
-}
-
-// AddEntryToUserVocab registers invocation of AddEntryToUserVocab func and calls it.
-func (s *VocabService) AddEntryToUserVocab(entryID, userID int) error {
-	s.AddEntryToUserVocabInvoked = true
-	return s.AddEntryToUserVocabFn(entryID, userID)
-}
-
-// RemoveEntryFromUserVocab registers invocation of RemoveEntryFromUserVocab func and calls it.
-func (s *VocabService) RemoveEntryFromUserVocab(entryID, userID int) error {
-	s.RemoveEntryFromUserVocabInvoked = true
-	return s.RemoveEntryFromUserVocabFn(entryID, userID)
-}
-
-// Reset resets functions invocation.
-func (s *VocabService) Reset() {
-	s.CreateVocabInvoked = false
-	s.CheckEntryInUserVocabInvoked = false
-	s.AddEntryToUserVocabInvoked = false
-	s.RemoveEntryFromUserVocabInvoked = false
-	s.VocabEntryService.Reset()
 }
 
 type VocabEntryService struct {
@@ -201,11 +160,14 @@ type VocabServiceConcurrencyCheck struct {
 	CheckEntryInUserVocabFn      func(entryID, userID int) (bool, error)
 	CheckEntryInUserVocabInvoked bool
 
-	RemoveEntryFromUserVocabFn      func(entryID, userID int) error
-	RemoveEntryFromUserVocabInvoked bool
+	GetRandomEntryFromUserVocabFn      func(userId, previousEntryID int) (*domain.VocabEntry, error)
+	GetRandomEntryFromUserVocabInvoked bool
 
 	GetEntriesFromUserVocabFn      func(userID int) ([]*domain.VocabEntry, error)
 	GetEntriesFromUserVocabInvoked bool
+
+	RemoveEntryFromUserVocabFn      func(entryID, userID int) error
+	RemoveEntryFromUserVocabInvoked bool
 
 	GetVocabEntryByTextFn      func(text string) (*domain.VocabEntry, error)
 	GetVocabEntryByTextInvoked bool
@@ -262,12 +224,12 @@ func (s *VocabServiceConcurrencyCheck) CheckEntryInUserVocab(entryID, userID int
 	return s.CheckEntryInUserVocabFn(entryID, userID)
 }
 
-// RemoveEntryFromUserVocab registers invocation of RemoveEntryFromUserVocab func and calls it.
+// GetRandomEntryFromUserVocab registers invocation of GetRandomEntryFromUserVocab func and calls it.
 // Also registers if it was called concurrently by the same user.
-func (s *VocabServiceConcurrencyCheck) RemoveEntryFromUserVocab(entryID, userID int) error {
-	s.startWorkSyncedByUserID(userID, &s.RemoveEntryFromUserVocabInvoked)
+func (s *VocabServiceConcurrencyCheck) GetRandomEntryFromUserVocab(userID, previousEntryID int) (*domain.VocabEntry, error) {
+	s.startWorkSyncedByUserID(userID, &s.GetRandomEntryFromUserVocabInvoked)
 	defer s.endWorkSyncedByUserID(userID)
-	return s.RemoveEntryFromUserVocabFn(entryID, userID)
+	return s.GetRandomEntryFromUserVocabFn(userID, previousEntryID)
 }
 
 // GetEntriesByUserID registers invocation of GetEntriesByUserID func and calls it.
@@ -276,6 +238,14 @@ func (s *VocabServiceConcurrencyCheck) GetEntriesFromUserVocab(userID int) ([]*d
 	s.startWorkSyncedByUserID(userID, &s.GetEntriesFromUserVocabInvoked)
 	defer s.endWorkSyncedByUserID(userID)
 	return s.GetEntriesFromUserVocabFn(userID)
+}
+
+// RemoveEntryFromUserVocab registers invocation of RemoveEntryFromUserVocab func and calls it.
+// Also registers if it was called concurrently by the same user.
+func (s *VocabServiceConcurrencyCheck) RemoveEntryFromUserVocab(entryID, userID int) error {
+	s.startWorkSyncedByUserID(userID, &s.RemoveEntryFromUserVocabInvoked)
+	defer s.endWorkSyncedByUserID(userID)
+	return s.RemoveEntryFromUserVocabFn(entryID, userID)
 }
 
 // GetVocabEntryByText registers invocation of GetVocabEntryByText func and calls it.

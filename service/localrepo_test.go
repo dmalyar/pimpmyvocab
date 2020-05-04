@@ -286,6 +286,163 @@ func TestVocabWithLocalRepo_CheckEntryInUserVocab(t *testing.T) {
 	}
 }
 
+func TestVocabWithLocalRepo_GetRandomEntryFromUserVocab(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		userID, previousEntryID int
+		expectedEntry           *domain.VocabEntry
+		expectErr               bool
+		expectGetEntryIDsInv    bool
+		expectGetEntryByIDInv   bool
+	}{
+		{
+			name:                  "Positive multiple entries",
+			userID:                1,
+			previousEntryID:       1,
+			expectedEntry:         &domain.VocabEntry{ID: 2},
+			expectGetEntryIDsInv:  true,
+			expectGetEntryByIDInv: true,
+		},
+		{
+			name:                  "Positive single entry",
+			userID:                2,
+			previousEntryID:       1,
+			expectedEntry:         &domain.VocabEntry{ID: 1},
+			expectGetEntryIDsInv:  true,
+			expectGetEntryByIDInv: true,
+		},
+		{
+			name:                 "Positive no entries",
+			userID:               3,
+			previousEntryID:      1,
+			expectGetEntryIDsInv: true,
+		},
+		{
+			name:                 "Get entry IDs returns error",
+			userID:               4,
+			previousEntryID:      1,
+			expectGetEntryIDsInv: true,
+			expectErr:            true,
+		},
+		{
+			name:                  "Get entry by ID returns error",
+			userID:                5,
+			previousEntryID:       1,
+			expectGetEntryIDsInv:  true,
+			expectGetEntryByIDInv: true,
+			expectErr:             true,
+		},
+	}
+
+	mockedRepo := &mock.VocabRepo{
+		GetEntryIDsByUserIDFn: func(userID int) ([]int, error) {
+			switch userID {
+			case 1:
+				return []int{1, 2}, nil
+			case 2:
+				return []int{1}, nil
+			case 4:
+				return nil, fmt.Errorf("error")
+			case 5:
+				return []int{5}, nil
+			default:
+				return nil, nil
+			}
+		},
+		GetVocabEntryByIDFn: func(id int) (*domain.VocabEntry, error) {
+			switch id {
+			case 5:
+				return nil, fmt.Errorf("error")
+			default:
+				return &domain.VocabEntry{ID: id}, nil
+			}
+		},
+	}
+
+	vocabService := NewVocabWithLocalRepo(mock.Logger{}, mockedRepo, &mock.VocabEntryService{})
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			entry, err := vocabService.GetRandomEntryFromUserVocab(c.userID, c.previousEntryID)
+			if !c.expectErr && err != nil {
+				t.Errorf("Expected no error, but got %s", err)
+			}
+			if c.expectErr && err == nil {
+				t.Errorf("Expected error, but got nothing")
+			}
+			if c.expectGetEntryIDsInv != mockedRepo.GetEntryIDsByUserIDInvoked {
+				t.Errorf("Actual invocation of GetEntryIDsByUserID(%v) doesn't match expectations", mockedRepo.GetEntryIDsByUserIDInvoked)
+			}
+			if c.expectGetEntryByIDInv != mockedRepo.GetVocabEntryByIDInvoked {
+				t.Errorf("Actual invocation of GetVocabEntryByID(%v) doesn't match expectations", mockedRepo.GetVocabEntryByIDInvoked)
+			}
+			if !reflect.DeepEqual(c.expectedEntry, entry) {
+				t.Errorf("Expected entry:%+v;Actual:%+v", c.expectedEntry, entry)
+			}
+			mockedRepo.Reset()
+		})
+	}
+}
+
+func TestVocabWithLocalRepo_GetEntriesFromUserVocab(t *testing.T) {
+	testCases := []struct {
+		name            string
+		userID          int
+		expectedEntries []*domain.VocabEntry
+		expectErr       bool
+	}{
+		{
+			name:   "Positive",
+			userID: 1,
+			expectedEntries: []*domain.VocabEntry{
+				{ID: 1, Text: "One"},
+				{ID: 2, Text: "Two"},
+			},
+		},
+		{
+			name:   "Positive no entries found",
+			userID: 2,
+		},
+		{
+			name:      "Get vocab entries returns err",
+			userID:    3,
+			expectErr: true,
+		},
+	}
+
+	mockedRepo := &mock.VocabRepo{
+		GetEntriesByUserIDFn: func(userID int) ([]*domain.VocabEntry, error) {
+			switch userID {
+			case 1:
+				return []*domain.VocabEntry{
+					{ID: 1, Text: "One"},
+					{ID: 2, Text: "Two"},
+				}, nil
+			case 3:
+				return nil, fmt.Errorf("error")
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	vocabService := NewVocabWithLocalRepo(mock.Logger{}, mockedRepo, &mock.VocabEntryService{})
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			entries, err := vocabService.GetEntriesFromUserVocab(c.userID)
+			if c.expectErr && err == nil {
+				t.Errorf("Expected error, but got nothing")
+			}
+			if !reflect.DeepEqual(c.expectedEntries, entries) {
+				t.Errorf("Expected res:%+v;Actual:%+v", c.expectedEntries, entries)
+			}
+			if !mockedRepo.GetEntriesByUserIDInvoked {
+				t.Errorf("GetEntriesByUserIDInvoked was not invoked")
+			}
+			mockedRepo.Reset()
+		})
+	}
+}
+
 func TestVocabWithLocalRepo_RemoveEntryFromUserVocab(t *testing.T) {
 	testCases := []struct {
 		name                 string
@@ -360,66 +517,6 @@ func TestVocabWithLocalRepo_RemoveEntryFromUserVocab(t *testing.T) {
 			}
 			if c.expectErr && err == nil {
 				t.Errorf("Expected error, but got nothing")
-			}
-			mockedRepo.Reset()
-		})
-	}
-}
-
-func TestVocabWithLocalRepo_GetEntriesFromUserVocab(t *testing.T) {
-	testCases := []struct {
-		name            string
-		userID          int
-		expectedEntries []*domain.VocabEntry
-		expectErr       bool
-	}{
-		{
-			name:   "Positive",
-			userID: 1,
-			expectedEntries: []*domain.VocabEntry{
-				{ID: 1, Text: "One"},
-				{ID: 2, Text: "Two"},
-			},
-		},
-		{
-			name:   "Positive no entries found",
-			userID: 2,
-		},
-		{
-			name:      "Get vocab entries returns err",
-			userID:    3,
-			expectErr: true,
-		},
-	}
-
-	mockedRepo := &mock.VocabRepo{
-		GetEntriesByUserIDFn: func(userID int) ([]*domain.VocabEntry, error) {
-			switch userID {
-			case 1:
-				return []*domain.VocabEntry{
-					{ID: 1, Text: "One"},
-					{ID: 2, Text: "Two"},
-				}, nil
-			case 3:
-				return nil, fmt.Errorf("error")
-			default:
-				return nil, nil
-			}
-		},
-	}
-
-	vocabService := NewVocabWithLocalRepo(mock.Logger{}, mockedRepo, &mock.VocabEntryService{})
-	for _, c := range testCases {
-		t.Run(c.name, func(t *testing.T) {
-			entries, err := vocabService.GetEntriesFromUserVocab(c.userID)
-			if c.expectErr && err == nil {
-				t.Errorf("Expected error, but got nothing")
-			}
-			if !reflect.DeepEqual(c.expectedEntries, entries) {
-				t.Errorf("Expected res:%+v;Actual:%+v", c.expectedEntries, entries)
-			}
-			if !mockedRepo.GetEntriesByUserIDInvoked {
-				t.Errorf("GetEntriesByUserIDInvoked was not invoked")
 			}
 			mockedRepo.Reset()
 		})

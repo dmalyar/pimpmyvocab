@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,6 +30,8 @@ const (
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	initViper()
 
 	logger := initLogger()

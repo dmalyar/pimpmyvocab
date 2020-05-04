@@ -38,6 +38,10 @@ const (
 		"FROM vocab v " +
 		"JOIN vocab_to_entry_link l on v.id = l.vocab_id " +
 		"WHERE l.entry_id = $1 and v.user_id = $2"
+	getEntryIDsByUserID = "SELECT l.entry_id " +
+		"FROM vocab v " +
+		"JOIN vocab_to_entry_link l on v.id = l.vocab_id " +
+		"WHERE v.user_id = $1"
 	getEntriesByUserID = "SELECT e.id, e.text, e.transcription, t.text " +
 		"FROM vocab v " +
 		"JOIN vocab_to_entry_link l on v.id = l.vocab_id " +
@@ -51,7 +55,8 @@ const (
 	addTranslation = "INSERT INTO translation(vocab_entry_id, text, class, position) " +
 		"VALUES ($1, $2, $3, $4) RETURNING id"
 	getTranslationsByEntryID = "SELECT id, text, class, position " +
-		"FROM translation WHERE vocab_entry_id = $1"
+		"FROM translation WHERE vocab_entry_id = $1 " +
+		"ORDER BY position"
 )
 
 // AddVocab inserts the given vocab to DB and returns it with inserted ID.
@@ -68,7 +73,7 @@ func (p *Postgres) AddVocab(vocab *domain.Vocab) (*domain.Vocab, error) {
 }
 
 // GetVocabByUserID returns the vocab found by the given user ID.
-// Returns nil and no error if vocab is not found.
+// Returns nil and no error if vocab was not found.
 func (p *Postgres) GetVocabByUserID(userID int) (*domain.Vocab, error) {
 	logger := p.logger.WithField("userID", userID)
 	logger.Debug("Getting vocab by user ID from DB")
@@ -132,7 +137,7 @@ func (p *Postgres) AddVocabEntry(entry *domain.VocabEntry) (*domain.VocabEntry, 
 }
 
 // GetVocabEntryByText returns the vocab entry found by the given text.
-// Returns nil and no error if vocab entry is not found.
+// Returns nil and no error if vocab entry was not found.
 func (p *Postgres) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {
 	logger := p.logger.WithField("text", text)
 	logger.Debug("Getting vocab entry by text from DB")
@@ -141,7 +146,7 @@ func (p *Postgres) GetVocabEntryByText(text string) (*domain.VocabEntry, error) 
 }
 
 // GetVocabEntryByID returns the vocab entry found by the given ID.
-// Returns nil and no error if vocab entry is not found.
+// Returns nil and no error if vocab entry was not found.
 func (p *Postgres) GetVocabEntryByID(id int) (*domain.VocabEntry, error) {
 	logger := p.logger.WithField("id", id)
 	logger.Debug("Getting vocab entry by ID from DB")
@@ -212,7 +217,28 @@ func (p *Postgres) CheckEntryInUserVocab(entryID, userID int) (bool, error) {
 	return true, nil
 }
 
+// GetEntryIDsByUserID returns IDs of all entries linked to the user's vocab.
+func (p *Postgres) GetEntryIDsByUserID(userID int) ([]int, error) {
+	contextLog := p.logger.WithField("userID", userID)
+	contextLog.Debug("Getting entry IDs from the user's vocab from DB")
+	rows, err := p.pool.Query(context.Background(), getEntryIDsByUserID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("getting entry IDs from the user's vocab from DB: %s", err)
+	}
+	var ids []int
+	for rows.Next() {
+		var id int
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, fmt.Errorf("scanning row with id: %s", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // GetEntriesByUserID returns all entries linked to the user's vocab.
+// Returned entries have only main translation.
 func (p *Postgres) GetEntriesByUserID(userID int) ([]*domain.VocabEntry, error) {
 	contextLog := p.logger.WithField("userID", userID)
 	contextLog.Debug("Getting entries from the user's vocab from DB")

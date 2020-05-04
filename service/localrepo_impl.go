@@ -5,6 +5,7 @@ import (
 	"github.com/dmalyar/pimpmyvocab/domain"
 	"github.com/dmalyar/pimpmyvocab/log"
 	"github.com/dmalyar/pimpmyvocab/repo"
+	"math/rand"
 )
 
 // VocabWithLocalRepo implements service.Vocab interface for working with local repository.
@@ -53,6 +54,7 @@ func (v *VocabWithLocalRepo) ClearUserVocab(userID int) error {
 	if err != nil {
 		return fmt.Errorf("removing all entries from the user's vocab: %s", err)
 	}
+	logger.Debugf("User's vocab cleared")
 	return nil
 }
 
@@ -98,6 +100,54 @@ func (v *VocabWithLocalRepo) CheckEntryInUserVocab(entryID, userID int) (bool, e
 	return inVocab, nil
 }
 
+// GetRandomEntryFromUserVocab returns a random vocab entry from the user's vocab.
+// If there is no entry in the user's vocab then returns nil.
+// If the given previousEntryID is not 0 then uses it to not return the same entry.
+// Ignores if it is the only entry in the vocab.
+func (v *VocabWithLocalRepo) GetRandomEntryFromUserVocab(userID int, previousEntryID int) (*domain.VocabEntry, error) {
+	logger := v.logger.WithFields(map[string]interface{}{
+		"userID":          userID,
+		"previousEntryID": previousEntryID,
+	})
+	logger.Debug("Getting random vocab entry")
+	entryIDs, err := v.localRepo.GetEntryIDsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	qnt := len(entryIDs)
+	var id int
+	if qnt == 0 {
+		logger.Info("User's vocab is empty")
+		return nil, nil
+	}
+	if qnt == 1 {
+		id = entryIDs[0]
+	} else {
+		r := rand.Intn(qnt)
+		id = entryIDs[r]
+		if id == previousEntryID {
+			rr := rand.Intn(qnt)
+			for rr == r {
+				rr = rand.Intn(qnt)
+			}
+			id = entryIDs[rr]
+		}
+	}
+	return v.GetVocabEntryByID(id)
+}
+
+// GetEntriesByUserID returns all entries linked to the user's vocab.
+func (v *VocabWithLocalRepo) GetEntriesFromUserVocab(userID int) ([]*domain.VocabEntry, error) {
+	logger := v.logger.WithField("userID", userID)
+	logger.Debugf("Getting vocab entries")
+	entries, err := v.localRepo.GetEntriesByUserID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("getting vocab entries by user ID: %s", err)
+	}
+	logger.Infof("Found %v entry(-ies)", len(entries))
+	return entries, nil
+}
+
 // RemoveEntryFromUserVocab removes the vocab entry from the user's vocab.
 // If the entry is not in the user's vocab then do nothing.
 func (v *VocabWithLocalRepo) RemoveEntryFromUserVocab(entryID, userID int) error {
@@ -121,31 +171,19 @@ func (v *VocabWithLocalRepo) RemoveEntryFromUserVocab(entryID, userID int) error
 	return nil
 }
 
-// GetEntriesByUserID returns all entries linked to the user's vocab.
-func (v *VocabWithLocalRepo) GetEntriesFromUserVocab(userID int) ([]*domain.VocabEntry, error) {
-	logger := v.logger.WithField("userID", userID)
-	logger.Debugf("Getting vocab entries")
-	entries, err := v.localRepo.GetEntriesByUserID(userID)
-	if err != nil {
-		return nil, fmt.Errorf("getting vocab entries by user ID: %s", err)
-	}
-	logger.Infof("Found %v entry(-ies)", len(entries))
-	return entries, nil
-}
-
 // GetVocabEntryByText looks for vocab entry in the local repo by the given text.
 // If it's found then returns it. If not then calls entry service method. If entry is found there then adds it
 // to the local repo.
 // If it's not found there then returns nil.
 func (v *VocabWithLocalRepo) GetVocabEntryByText(text string) (*domain.VocabEntry, error) {
 	logger := v.logger.WithField("text", text)
-	logger.Info("Getting vocab entry")
+	logger.Debug("Getting vocab entry")
 	entry, err := v.localRepo.GetVocabEntryByText(text)
 	if err != nil {
 		return nil, fmt.Errorf("getting vocab entry by text in the local repo: %s", err)
 	}
 	if entry != nil {
-		logger.Info("Found vocab entry in the local repo: %s", entry)
+		logger.WithField("entry", entry).Info("Vocab entry found in the local repo")
 		return entry, nil
 	}
 	logger.Info("Vocab entry not found in the local repo")
@@ -157,23 +195,25 @@ func (v *VocabWithLocalRepo) GetVocabEntryByText(text string) (*domain.VocabEntr
 		logger.Info("Vocab entry not found in the vocab entry service")
 		return nil, nil
 	}
+	logger.WithField("entry", entry)
 	logger.Info("Vocab entry found in the vocab entry service")
 	entry, err = v.localRepo.AddVocabEntry(entry)
 	if err != nil {
 		return nil, fmt.Errorf("adding vocab entry to the local repo: %s", err)
 	}
-	logger.Info("Vocab entry added to the local repo: %s", entry)
+	logger.Info("Vocab entry added to the local repo")
 	return entry, nil
 }
 
 // GetVocabEntryByID returns vocab entry found in the local repo by ID.
-// Returns nil if entry is not found.
+// Returns nil if entry was not found.
 func (v *VocabWithLocalRepo) GetVocabEntryByID(id int) (*domain.VocabEntry, error) {
 	logger := v.logger.WithField("id", id)
-	logger.Info("Getting vocab entry")
-	ve, err := v.localRepo.GetVocabEntryByID(id)
+	logger.Debug("Getting vocab entry")
+	entry, err := v.localRepo.GetVocabEntryByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting vocab entry: %s", err)
 	}
-	return ve, nil
+	logger.WithField("entry", entry).Info("Vocab entry found in the local repo")
+	return entry, nil
 }

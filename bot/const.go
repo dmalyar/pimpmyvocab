@@ -1,9 +1,10 @@
 package bot
 
 const (
-	startCommand = "/start"
-	listCommand  = "/list"
-	clearCommand = "/clear"
+	startCommand  = "/start"
+	listCommand   = "/list"
+	clearCommand  = "/clear"
+	repeatCommand = "/repeat"
 
 	startReply                  = "Start successful reply" // TODO change text
 	techErrReply                = "Кажется, у бота технические проблемы :(\nПопробуйте повторить запрос позже. А мы пока поменяем ему масло."
@@ -18,16 +19,18 @@ const (
 	removeFromVocabButton = "Удалить из словаря"
 	yesButton             = "Да"
 	noButton              = "Нет"
+	newWordButton         = "Новое слово"
 )
 
 type CallbackCommand int
 
 const (
-	showFullDesc CallbackCommand = iota
-	addToVocab
-	addToVocabFullDesc
-	removeFromVocab
-	removeFromVocabFullDesc
-	clearVocabAccept
-	clearVocabDecline
+	showFullDescCallbackCmd CallbackCommand = iota
+	addToVocabCallbackCmd
+	addToVocabFullDescCallbackCmd
+	rmFromVocabCallbackCmd
+	rmFromVocabFullDescCallbackCmd
+	clearVocabAcceptCallbackCmd
+	clearVocabDeclineCallbackCmd
+	repeatCallbackCmd
 )

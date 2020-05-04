@@ -45,8 +45,11 @@ func (e *VocabEntry) ShortDesc() string {
 	}
 }
 
-func (e *VocabEntry) FullDesc() string {
+func (e *VocabEntry) FullDesc(printEntryText bool) string {
 	builder := new(strings.Builder)
+	if printEntryText {
+		builder.WriteString(fmt.Sprintln(e.Text))
+	}
 	if e.Transcription != "" {
 		builder.WriteString(fmt.Sprintf("[%s]", e.Transcription))
 	}

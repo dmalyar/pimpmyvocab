@@ -14,6 +14,7 @@ type Vocab interface {
 
 	AddEntryToUserVocab(entryID, userID int) error
 	CheckEntryInUserVocab(entryID, userID int) (bool, error)
+	GetEntryIDsByUserID(userID int) ([]int, error)
 	GetEntriesByUserID(userID int) ([]*domain.VocabEntry, error)
 	RemoveEntryFromUserVocab(entryID, userID int) error
 }
