@@ -38,6 +38,7 @@ func (b *Bot) Run() {
 		b.logger.Panicf("Error getting bot updates chan: %s", err)
 	}
 	b.logger.Info("Successfully got updates channel and start processing messages")
+	b.processOfflineUpdates(updates)
 	for update := range updates {
 		if update.Message != nil {
 			go b.processMessage(update.Message)
@@ -49,6 +50,48 @@ func (b *Bot) Run() {
 		}
 		b.logger.Info("Received update of unsupported type")
 	}
+}
+
+func (b *Bot) processOfflineUpdates(updates tgbotapi.UpdatesChannel) {
+	b.logger.Info("Start processing updates received while being offline")
+	t := time.NewTimer(time.Second)
+	ids := make(map[int64]struct{})
+	startCommandMsgs := make(map[int64]*tgbotapi.Message)
+loop:
+	for {
+		select {
+		case u := <-updates:
+			if u.Message != nil {
+				ids[u.Message.Chat.ID] = struct{}{}
+				if u.Message.Text == startCommand {
+					startCommandMsgs[u.Message.Chat.ID] = u.Message
+				}
+			}
+			if u.CallbackQuery != nil {
+				ids[u.CallbackQuery.Message.Chat.ID] = struct{}{}
+			}
+			t.Reset(time.Second)
+		case <-t.C:
+			break loop
+		}
+	}
+	t.Stop()
+	for _, m := range startCommandMsgs {
+		msg := &message{
+			id:       m.MessageID,
+			chatID:   m.Chat.ID,
+			userID:   m.From.ID,
+			userName: m.From.UserName,
+			text:     m.Text,
+		}
+		logger := b.logger.WithField("message", msg)
+		b.processStartCommand(logger, msg)
+	}
+	for id := range ids {
+		b.send(b.logger, newReply(id, offlineReply))
+	}
+
+	b.logger.Info("Messages received while being offline processed")
 }
 
 func (b *Bot) processMessage(in *tgbotapi.Message) {
@@ -128,13 +171,15 @@ func (b *Bot) processCallback(in *tgbotapi.CallbackQuery) {
 
 func (b *Bot) processStartCommand(logger log.Logger, msg *message) {
 	logger.Info("Received /start command")
-	_, err := b.vocabService.CreateVocab(msg.userID)
+	vocab, err := b.vocabService.CreateVocab(msg.userID)
 	if err != nil {
 		logger.Errorf("Error creating vocab: %s", err)
 		b.send(logger, newReply(msg.chatID, techErrReply))
 		return
 	}
-	b.send(logger, newReply(msg.chatID, helpReply))
+	if vocab != nil {
+		b.send(logger, newReply(msg.chatID, helpReply))
+	}
 	logger.Info("Processed /start command")
 }
 
