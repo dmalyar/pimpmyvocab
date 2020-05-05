@@ -65,6 +65,8 @@ func (b *Bot) processMessage(in *tgbotapi.Message) {
 	switch {
 	case text == startCommand:
 		b.processStartCommand(logger, msg)
+	case text == helpCommand:
+		b.processHelpCommand(logger, msg)
 	case text == listCommand:
 		b.processListCommand(logger, msg)
 	case text == clearCommand:
@@ -132,8 +134,14 @@ func (b *Bot) processStartCommand(logger log.Logger, msg *message) {
 		b.send(logger, newReply(msg.chatID, techErrReply))
 		return
 	}
-	b.send(logger, newReply(msg.chatID, startReply))
+	b.send(logger, newReply(msg.chatID, helpReply))
 	logger.Info("Processed /start command")
+}
+
+func (b *Bot) processHelpCommand(logger log.Logger, msg *message) {
+	logger.Info("Received /help command")
+	b.send(logger, newReply(msg.chatID, helpReply))
+	logger.Info("Processed /help command")
 }
 
 func (b *Bot) processListCommand(logger log.Logger, msg *message) {
