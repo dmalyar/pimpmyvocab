@@ -1,12 +1,14 @@
+# For docker usage: leave it here
+# For non-docker usage: copy it to $HOME/.pimpmyvocab
 log:
-  level:              # optional (default: debug)
-  file:               # optional (example: /home/sweet/.pimpmyvocab/pmv.log
+  level:          # optional (default: debug)
+  file:           # optional (for docker: /pimpmyvocab/logs/bot.log)
 db:
-  url:                # required (example: postgresql://user:pass@localhost:5432/postgres)
-  migration-path:     # required (example: $project_location/repo/migration)
+  url:            # required (example: postgresql://user:pass@host:port/db_name)
+  migration-path: # required (for docker: /pimpmyvocab/db/migration)
 bot:
-  use-proxy:          # true/false (default: false)
-  proxy-url:          # required if use-proxy == true
-  token:              # required
+  use-proxy:      # optional (true/false; default: false)
+  proxy-url:      # required if use-proxy == true
+  token:          # required
 dictionary:
-  token:              # required
+  token:          # required (yandex.Dictionary token)

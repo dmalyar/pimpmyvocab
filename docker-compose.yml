@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  bot:
+    container_name: pmv_bot
+    build: .
+    image: pmv_bot:1.0
+    command: ["./wait-for-it.sh", "db:5432", "--", "./pmv_bot"]
+    depends_on:
+      - db
+    volumes:
+      - bot_data
+    restart: always
+  db:
+    container_name: pmv_db
+    image: postgres:12.2-alpine
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data
+    restart: always
+volumes:
+  bot_data:
+  db_data:

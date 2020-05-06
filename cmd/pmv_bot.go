@@ -56,7 +56,8 @@ func initViper() {
 	viper.SetDefault(logLevelKey, "debug")
 
 	viper.SetConfigName("config")
-	viper.AddConfigPath("$HOME/.pimpmyvocab")
+	viper.AddConfigPath("$HOME/.pimpmyvocab") // local
+	viper.AddConfigPath("/pimpmyvocab")       // docker
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(fmt.Sprintf("Error reading the config file: %s", err))
