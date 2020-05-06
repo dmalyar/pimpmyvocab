@@ -9,23 +9,27 @@ import (
 	"github.com/dmalyar/pimpmyvocab/repo"
 	"github.com/dmalyar/pimpmyvocab/service"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 )
 
 const (
 	logLevelKey        = "log.level"
-	logFileKey         = "log.file"
+	logFilePathKey     = "log.file"
 	tokenKey           = "bot.token"
 	useProxyKey        = "bot.use-proxy"
 	proxyURLKey        = "bot.proxy-url"
 	dbUrlKey           = "db.url"
+	dbMigrationPathKey = "db.migration-path"
 	dictionaryTokenKey = "dictionary.token"
 )
 
@@ -62,15 +66,17 @@ func initViper() {
 func initLogger() *log.LoggerLogrus {
 	logger := logrus.StandardLogger()
 
-	logFilePath := viper.GetString(logFileKey)
-	var file *os.File
+	logFilePath := viper.GetString(logFilePathKey)
+	var lumberjackLogger *lumberjack.Logger
 	if logFilePath != "" {
-		file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err == nil {
-			logger.SetOutput(file)
-		} else {
-			logger.Errorf("Error setting logger to write to file: %s", err)
+		lumberjackLogger = &lumberjack.Logger{
+			Filename:   logFilePath,
+			MaxSize:    50,
+			MaxBackups: 10,
+			MaxAge:     0,
+			LocalTime:  true,
 		}
+		logrus.SetOutput(lumberjackLogger)
 	}
 
 	level, err := logrus.ParseLevel(viper.GetString(logLevelKey))
@@ -81,7 +87,7 @@ func initLogger() *log.LoggerLogrus {
 	logger.SetLevel(level)
 
 	logger.Info("Logger initialized")
-	return log.New(logger, file)
+	return log.New(logger, lumberjackLogger)
 }
 
 func initBotAPI(logger log.Logger) *tgbotapi.BotAPI {
@@ -124,6 +130,7 @@ func initVocabRepo(logger log.Logger) *repo.Postgres {
 	if dbUrl == "" {
 		logger.Panic("DB URL not found in the config file")
 	}
+	migrateSchema(logger, dbUrl)
 	connConfig, err := pgxpool.ParseConfig(dbUrl)
 	if err != nil {
 		logger.Panicf("Error parsing DB URL: %s", err)
@@ -137,7 +144,26 @@ func initVocabRepo(logger log.Logger) *repo.Postgres {
 	return repo.NewPostgresRepo(logger, dbPool)
 }
 
-func initVocabEntryService(logger log.Logger) service.VocabEntry {
+func migrateSchema(logger log.Logger, dbUrl string) {
+	logger.Info("Migrating DB schema")
+	migrationPath := viper.GetString(dbMigrationPathKey)
+	if migrationPath == "" {
+		logger.Panic("DB migration path not found in the config file")
+	}
+	m, err := migrate.New(
+		"file://"+migrationPath,
+		dbUrl,
+	)
+	if err != nil {
+		logger.Panicf("Error migrating schema: %s", err)
+	}
+	if err = m.Up(); err != nil && err != migrate.ErrNoChange {
+		logger.Panicf("Error migrating schema: %s", err)
+	}
+	logger.Info("DB schema migrated")
+}
+
+func initVocabEntryService(logger log.Logger) *dictionary.Yandex {
 	logger.Info("Initializing vocab entry service")
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -151,7 +177,7 @@ func initVocabEntryService(logger log.Logger) service.VocabEntry {
 	return dictionary.NewYandexDict(logger, client, dictionaryURL)
 }
 
-func initVocabService(logger log.Logger, vocabRepo repo.Vocab, vocabEntryService service.VocabEntry) service.Vocab {
+func initVocabService(logger log.Logger, vocabRepo repo.Vocab, vocabEntryService service.VocabEntry) *service.ConcurrentVocab {
 	localRepoService := service.NewVocabWithLocalRepo(logger, vocabRepo, vocabEntryService)
 	return service.NewConcurrentVocab(localRepoService)
 }

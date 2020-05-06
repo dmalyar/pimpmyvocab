@@ -2,7 +2,7 @@ package log
 
 import (
 	"github.com/sirupsen/logrus"
-	"os"
+	"io"
 )
 
 type Logger interface {
@@ -27,13 +27,13 @@ type Logger interface {
 
 type LoggerLogrus struct {
 	logrus.FieldLogger
-	file *os.File
+	out io.Closer
 }
 
-func New(logger *logrus.Logger, file *os.File) *LoggerLogrus {
+func New(logger *logrus.Logger, out io.Closer) *LoggerLogrus {
 	return &LoggerLogrus{
 		FieldLogger: logger,
-		file:        file,
+		out:         out,
 	}
 }
 
@@ -48,10 +48,10 @@ func (l *LoggerLogrus) WithFields(fields map[string]interface{}) Logger {
 }
 
 func (l *LoggerLogrus) Close() {
-	if l.file == nil {
+	if l.out == nil {
 		return
 	}
-	err := l.file.Close()
+	err := l.out.Close()
 	if err != nil {
 		l.Errorf("Error closing log file: %s", err)
 	}
