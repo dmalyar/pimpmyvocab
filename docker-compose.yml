@@ -8,7 +8,9 @@ services:
     depends_on:
       - db
     volumes:
-      - bot_data
+      - bot_data:/pimpmyvocab
+    networks:
+      - net
     restart: always
   db:
     container_name: pmv_db
@@ -20,8 +22,15 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - db_data
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - net
     restart: always
 volumes:
   bot_data:
+    name: pmv_bot_data
   db_data:
+    name: pmv_db_data
+networks:
+  net:
+    name: pmv_net
