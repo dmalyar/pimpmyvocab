@@ -10,4 +10,4 @@ RUN apk add --no-cache bash
 WORKDIR /pimpmyvocab
 COPY --from=builder ["/pimpmyvocab/out/pmv_bot", "/pimpmyvocab/config.yaml", "/pimpmyvocab/wait-for-it.sh", "./"]
 COPY --from=builder /pimpmyvocab/repo/migration db/migration
-# CMD ["pmv_bot"] # Uncomment for use without docker-compose
+# CMD ["pmv_bot"] # Uncomment for using without docker-compose
