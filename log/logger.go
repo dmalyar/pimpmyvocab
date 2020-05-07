@@ -3,6 +3,7 @@ package log
 import (
 	"github.com/sirupsen/logrus"
 	"io"
+	"reflect"
 )
 
 type Logger interface {
@@ -48,7 +49,7 @@ func (l *LoggerLogrus) WithFields(fields map[string]interface{}) Logger {
 }
 
 func (l *LoggerLogrus) Close() {
-	if l.out == nil {
+	if l.out == nil || (reflect.ValueOf(l.out).Kind() == reflect.Ptr && reflect.ValueOf(l.out).IsNil()) {
 		return
 	}
 	err := l.out.Close()

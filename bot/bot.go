@@ -120,6 +120,8 @@ func (b *Bot) processMessage(in *tgbotapi.Message) {
 		b.processQuizCommand(logger, msg)
 	case strings.HasPrefix(text, "/"):
 		logger.Info("Received unsupported command")
+	case text == "":
+		logger.Info("Received msg with no text")
 	default:
 		b.processText(logger, msg)
 	}
