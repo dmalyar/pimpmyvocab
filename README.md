@@ -24,13 +24,13 @@ The running instance: @PimpMyVocab_bot
 - Fill config.yaml file
 - Run `docker-compose up` from project's root folder
 
-### Dockerized app
+### Dockerized app:
 - Run postgres DB instance
 - Fill config.yaml file
 - Uncomment last line in the Dockerfile
 - Run `docker build --tag pmv:1.0 .` and then `docker run --name pmv pmv:1.0`
 
-### Non-dockerized app
+### Non-dockerized app:
 - Run postgres DB instance
 - Fill config.yaml and copy it to `$HOME/.pimpmyvocab` folder
 - Build/Install and run it just like any other go app
