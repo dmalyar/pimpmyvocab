@@ -28,7 +28,7 @@ The running instance: @PimpMyVocab_bot
 - Run postgres DB instance
 - Fill config.yaml file
 - Uncomment last line in the Dockerfile
-- Run `docker build --tag pmv:1.0 .` and then `docker run --name pmv pmv:1.0`
+- Run `docker build --tag pmv:1.0.0 .` and then `docker run --name pmv pmv:1.0.0`
 
 ### Non-dockerized app:
 - Run postgres DB instance

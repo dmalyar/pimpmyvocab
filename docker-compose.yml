@@ -3,7 +3,7 @@ services:
   bot:
     container_name: pmv_bot
     build: .
-    image: pmv_bot:1.0
+    image: pmv_bot:1.0.0
     command: ["./wait-for-it.sh", "db:5432", "--", "./pmv_bot"]
     depends_on:
       - db
