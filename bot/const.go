@@ -24,7 +24,7 @@ const (
 	clearVocabConfirmationReply = "Вы уверены, что хотите удалить все записи из своего словаря?"
 	clearVocabDeclinedReply     = "Вот и правильно, отличный же словарь!"
 	clearVocabAcceptedReply     = "Готово! Начните с чистого листа!"
-	wordNotFoundReply           = "А вы точно продюссер? А это точно английское слово?\n" +
+	wordNotFoundReply           = "А вы точно продюсер? А это точно английское слово?\n" +
 		"Просто бот по нему ничего не нашёл :("
 
 	showFullDescButton    = "Все варианты перевода"
