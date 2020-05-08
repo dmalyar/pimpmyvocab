@@ -8,7 +8,7 @@ services:
     depends_on:
       - db
     volumes:
-      - bot_data:/pimpmyvocab
+      - bot_logs:/pimpmyvocab/logs
     networks:
       - net
     restart: always
@@ -27,8 +27,8 @@ services:
       - net
     restart: always
 volumes:
-  bot_data:
-    name: pmv_bot_data
+  bot_logs:
+    name: pmv_bot_logs
   db_data:
     name: pmv_db_data
 networks:
